@@ -98,11 +98,22 @@ void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value)
 
 void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value)
 {
-    INFO("Decoded Sensor Status message from 0x%04X [%d ms], TOTAL DEVICE ENERGY USE with value of: %d.%02d\n\n",
+    INFO("Decoded Sensor Status message from 0x%04X [%d ms], TOTAL DEVICE ENERGY USE with value of: "
+         "%d.%02d Wh \n\n",
          src_addr,
          millis(),
          sensor_value.energy);
     LCD_UpdateSensorValue(TOTAL_DEVICE_ENERGY_USE, sensor_value);
+}
+
+void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value)
+{
+    INFO("Decoded Sensor Status message from 0x%04X [%d ms], PRECISE TOTAL DEVICE ENERGY USE with value of: "
+         "%d.%02d Wh \n\n",
+         src_addr,
+         millis(),
+         sensor_value.precise_energy);
+    LCD_UpdateSensorValue(PRECISE_TOTAL_DEVICE_ENERGY_USE, sensor_value);
 }
 
 void SetupSensor(void)

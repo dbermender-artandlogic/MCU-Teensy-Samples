@@ -272,7 +272,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MESH_PROPERTY_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL 0xFFFFFF
 #define MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL 0xFFFF
 #define MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL 0xFFFF
-#define MESH_PROPERTY_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL 0xFFFFFF
+#define MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL 0xFFFFFFFF
 
 
 /*
@@ -302,26 +302,26 @@ uint8_t GetSensorServerPIRIdx(void);
 /*
  *  Sensor Server Voltage Current instance index setter
  */
-void SetSensorServerVoltCurrIdx(uint8_t idx);
+void SetSensorServerCurrPreciseEnergyIdx(uint8_t idx);
 
 /*
  *  Sensor Server Voltage Current instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerVoltCurrIdx(void);
+uint8_t GetSensorServerCurrPreciseEnergyIdx(void);
 
 /*
  *  Sensor Server Power Energy instance index setter
  */
-void SetSensorServerPowEnergyIdx(uint8_t idx);
+void SetSensorServerVoltPowIdx(uint8_t idx);
 
 /*
  *  Sensor Server Power Energy instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerPowEnergyIdx(void);
+uint8_t GetSensorServerVoltPowIdx(void);
 
 /*
  *  Setup sensor server hardware

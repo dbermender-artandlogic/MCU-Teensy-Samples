@@ -178,4 +178,12 @@ extern void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_v
  */
 extern void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
 
+/*
+ *  Process Precise Energy value update
+ *
+ *  @param value       New Energy value
+ *  @param src_addr    Source address
+ */
+extern void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+
 #endif    // MESH_H_

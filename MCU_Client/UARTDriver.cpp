@@ -7,7 +7,7 @@
 #include "kinetis.h"
 
 #define RX_BUFFER_LEN 512
-#define TX_BUFFER_LEN 1024
+#define TX_BUFFER_LEN 512
 
 #define C2_RX_ENABLE (UART_C2_TE | UART_C2_RE | UART_C2_RIE)
 #define C2_TX_ACTIVE (UART_C2_TIE)

@@ -34,16 +34,18 @@ typedef union
     uint16_t current;
     uint16_t voltage;
     uint32_t energy;
+    uint32_t precise_energy;
 } SensorValue_T;
 
 typedef enum
 {
-    PRESENCE_DETECTED           = 0x004D,
-    PRESENT_AMBIENT_LIGHT_LEVEL = 0x004E,
-    PRESENT_DEVICE_INPUT_POWER  = 0x0052,
-    PRESENT_INPUT_CURRENT       = 0x0057,
-    PRESENT_INPUT_VOLTAGE       = 0x0059,
-    TOTAL_DEVICE_ENERGY_USE     = 0x006A
+    PRESENCE_DETECTED               = 0x004D,
+    PRESENT_AMBIENT_LIGHT_LEVEL     = 0x004E,
+    PRESENT_DEVICE_INPUT_POWER      = 0x0052,
+    PRESENT_INPUT_CURRENT           = 0x0057,
+    PRESENT_INPUT_VOLTAGE           = 0x0059,
+    TOTAL_DEVICE_ENERGY_USE         = 0x006A,
+    PRECISE_TOTAL_DEVICE_ENERGY_USE = 0x0072
 } SensorProperty_T;
 
 
@@ -52,6 +54,8 @@ typedef enum
 #define MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL 0xFFFF
 #define MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL 0xFFFF
 #define MESH_PROPERTY_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL 0xFFFFFF
+#define MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL 0xFFFFFFFF
+#define MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_NOT_VALID_VAL 0xFFFFFFFE
 
 
 /*
@@ -115,6 +119,14 @@ void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value);
  *  @param src_addr           Source address
  */
 void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Precise Energy value update
+ *
+ *  @param sensor_value       New Energy value
+ *  @param src_addr           Source address
+ */
+void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Setup sensor server hardware

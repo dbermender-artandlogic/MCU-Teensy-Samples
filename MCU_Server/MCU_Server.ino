@@ -92,7 +92,34 @@ static const uint8_t als_registration[] = {
     ALS_UPDATE_INTERVAL,
 };
 
-static const uint8_t current_voltage_registration[] = {
+static const uint8_t current_precise_energy_registration[] = {
+    lowByte(MESH_MODEL_ID_SENSOR_SERVER),
+    highByte(MESH_MODEL_ID_SENSOR_SERVER),
+
+    0x02,    //Number of sensors
+
+    lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+    highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+    lowByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
+    highByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
+    lowByte(CURRENT_SENSOR_NEGATIVE_TOLERANCE),
+    highByte(CURRENT_SENSOR_NEGATIVE_TOLERANCE),
+    CURRENT_SENSOR_SAMPLING_FUNCTION,
+    CURRENT_SENSOR_MEASUREMENT_PERIOD,
+    CURRENT_SENSOR_UPDATE_INTERVAL,
+
+    lowByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+    highByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+    lowByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
+    highByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
+    lowByte(ENERGY_SENSOR_NEGATIVE_TOLERANCE),
+    highByte(ENERGY_SENSOR_NEGATIVE_TOLERANCE),
+    ENERGY_SENSOR_SAMPLING_FUNCTION,
+    ENERGY_SENSOR_MEASUREMENT_PERIOD,
+    ENERGY_SENSOR_UPDATE_INTERVAL,
+};
+
+static const uint8_t voltage_power_registration[] = {
     lowByte(MESH_MODEL_ID_SENSOR_SERVER),
     highByte(MESH_MODEL_ID_SENSOR_SERVER),
 
@@ -108,23 +135,6 @@ static const uint8_t current_voltage_registration[] = {
     VOLTAGE_SENSOR_MEASUREMENT_PERIOD,
     VOLTAGE_SENSOR_UPDATE_INTERVAL,
 
-    lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-    highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-    lowByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
-    highByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
-    lowByte(CURRENT_SENSOR_NEGATIVE_TOLERANCE),
-    highByte(CURRENT_SENSOR_NEGATIVE_TOLERANCE),
-    CURRENT_SENSOR_SAMPLING_FUNCTION,
-    CURRENT_SENSOR_MEASUREMENT_PERIOD,
-    CURRENT_SENSOR_UPDATE_INTERVAL,
-};
-
-static const uint8_t power_energy_registration[] = {
-    lowByte(MESH_MODEL_ID_SENSOR_SERVER),
-    highByte(MESH_MODEL_ID_SENSOR_SERVER),
-
-    0x02,    //Number of sensors
-
     lowByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
     highByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
     lowByte(POWER_SENSOR_POSITIVE_TOLERANCE),
@@ -134,16 +144,6 @@ static const uint8_t power_energy_registration[] = {
     POWER_SENSOR_SAMPLING_FUNCTION,
     POWER_SENSOR_MEASUREMENT_PERIOD,
     POWER_SENSOR_UPDATE_INTERVAL,
-
-    lowByte(MESH_PROPERTY_ID_TOTAL_DEVICE_ENERGY_USE),
-    highByte(MESH_PROPERTY_ID_TOTAL_DEVICE_ENERGY_USE),
-    lowByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
-    highByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
-    lowByte(ENERGY_SENSOR_NEGATIVE_TOLERANCE),
-    highByte(ENERGY_SENSOR_NEGATIVE_TOLERANCE),
-    ENERGY_SENSOR_SAMPLING_FUNCTION,
-    ENERGY_SENSOR_MEASUREMENT_PERIOD,
-    ENERGY_SENSOR_UPDATE_INTERVAL,
 };
 
 static const uint8_t health_registration[] = {
@@ -299,7 +299,7 @@ void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len)
         payload_len += sizeof(pir_registration) + sizeof(als_registration);
 
     if (ENERGYEnabled)
-        payload_len += sizeof(current_voltage_registration) + sizeof(power_energy_registration);
+        payload_len += sizeof(current_precise_energy_registration) + sizeof(voltage_power_registration);
 
     payload_len += sizeof(health_registration);
 
@@ -327,10 +327,10 @@ void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len)
 
     if (ENERGYEnabled)
     {
-        memcpy(model_ids + index, current_voltage_registration, sizeof(current_voltage_registration));
-        index += sizeof(current_voltage_registration);
-        memcpy(model_ids + index, power_energy_registration, sizeof(power_energy_registration));
-        index += sizeof(power_energy_registration);
+        memcpy(model_ids + index, current_precise_energy_registration, sizeof(current_precise_energy_registration));
+        index += sizeof(current_precise_energy_registration);
+        memcpy(model_ids + index, voltage_power_registration, sizeof(voltage_power_registration));
+        index += sizeof(voltage_power_registration);
     }
 
     memcpy(model_ids + index, health_registration, sizeof(health_registration));
@@ -356,8 +356,8 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
     SetLightnessServerIdx(INSTANCE_INDEX_UNKNOWN);
     SetSensorServerPIRIdx(INSTANCE_INDEX_UNKNOWN);
     SetSensorServerALSIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerVoltCurrIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerPowEnergyIdx(INSTANCE_INDEX_UNKNOWN);
+    SetSensorServerCurrPreciseEnergyIdx(INSTANCE_INDEX_UNKNOWN);
+    SetSensorServerVoltPowIdx(INSTANCE_INDEX_UNKNOWN);
 
     uint8_t sensor_server_model_id_occurency = 0;
 
@@ -386,13 +386,13 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
             {
                 SetSensorServerALSIdx(current_model_id_instance_index);
             }
-            else if (sensor_server_model_id_occurency == VOLT_CURR_REGISTRATION_ORDER && ENERGYEnabled)
+            else if (sensor_server_model_id_occurency == CURR_ENERGY_REGISTRATION_ORDER && ENERGYEnabled)
             {
-                SetSensorServerVoltCurrIdx(current_model_id_instance_index);
+                SetSensorServerCurrPreciseEnergyIdx(current_model_id_instance_index);
             }
-            else if (sensor_server_model_id_occurency == POW_ENERGY_REGISTRATION_ORDER && ENERGYEnabled)
+            else if (sensor_server_model_id_occurency == VOLT_POWER_REGISTRATION_ORDER && ENERGYEnabled)
             {
-                SetSensorServerPowEnergyIdx(current_model_id_instance_index);
+                SetSensorServerVoltPowIdx(current_model_id_instance_index);
             }
         }
 
@@ -424,14 +424,14 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
         return;
     }
 
-    if (GetSensorServerVoltCurrIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
+    if (GetSensorServerCurrPreciseEnergyIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
         INFO("Sensor server (Voltage Current) model id not found in init node message\n");
         return;
     }
 
-    if (GetSensorServerPowEnergyIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
+    if (GetSensorServerVoltPowIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
         INFO("Sensor server (Power Energy) model id not found in init node message\n");

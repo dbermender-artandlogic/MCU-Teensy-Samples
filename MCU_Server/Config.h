@@ -70,9 +70,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ALS_REGISTRATION_ORDER 0 /**< Defines sensor servers registration order */
 #endif
 
-#define VOLT_CURR_REGISTRATION_ORDER (ALS_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
-#define POW_ENERGY_REGISTRATION_ORDER \
-    (VOLT_CURR_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
+#define CURR_ENERGY_REGISTRATION_ORDER (ALS_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
+#define VOLT_POWER_REGISTRATION_ORDER \
+    (CURR_ENERGY_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
 
 #define PWM_RESOLUTION 16 /**< Defines PWM resolution value */
 

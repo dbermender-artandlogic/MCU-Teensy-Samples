@@ -32,28 +32,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "UARTProtocol.h"
 
 
-#define PIN_PIR 5  /**< Defines PIR sensor location */
-#define PIN_ALS 17 /**< Defines ALS sensor location */
+#define PIN_PIR 5  /**< PIR sensor location */
+#define PIN_ALS 17 /**< ALS sensor location */
 
-#define ALS_CONVERSION_COEFFICIENT 5UL     /**< Defines light sensor coefficient [centilux / millivolt]*/
-#define PIR_DEBOUNCE_TIME_MS 20            /**< Defines PIR debounce time in milliseconds */
-#define PIR_INERTIA_MS 4000                /**< Defines PIR inertia in milliseconds */
-#define SENSOR_UPDATE_INTV_PIR 200         /**< Defines sensor update in milliseconds for PIR Sensor */
-#define SENSOR_UPDATE_INTV_ALS 200         /**< Defines sensor update in milliseconds for ALS Sensor  */
-#define SENSOR_UPDATE_INTV_VOLT_CURR 1000  /**< Defines sensor update in milliseconds for Voltage and Current Sensor  */
-#define SENSOR_UPDATE_INTV_POW_ENERGY 1000 /**< Defines sensor update in milliseconds for Power and Energy Sensor  */
-#define ALS_REPORT_THRESHOLD 500           /**< Defines sensor threshold in centilux */
-#define ANALOG_REFERENCE_VOLTAGE_MV 3300   /**< Defines ADC reference voltage in millivolts */
-#define ANALOG_MIN 0                       /**< Defines lower range of analog measurements. */
-#define ANALOG_MAX 1023                    /**< Defines uppper range of analog measurements. */
+#define ALS_CONVERSION_COEFFICIENT 5UL      /**< light sensor coefficient [centilux / millivolt] */
+#define ALS_MAX_MODEL_VALUE (0xFFFFFF - 1)  /**<  Maximal allowed value of ALS reading passed to model */
+#define PIR_DEBOUNCE_TIME_MS 20             /**< Maximal PIR debounce time in milliseconds */
+#define PIR_INERTIA_MS 4000                 /**< PIR inertia in milliseconds */
+#define SENSOR_UPDATE_INTV_PIR 200          /**< sensor update in milliseconds for PIR Sensor */
+#define SENSOR_UPDATE_INTV_ALS 200          /**< sensor update in milliseconds for ALS Sensor */
+#define SENSOR_UPDATE_INTV_CURR_ENERGY 1000 /**< sensor update in milliseconds for Current and Precise Energy Sensor */
+#define SENSOR_UPDATE_INTV_VOLT_POWER 1000  /**< sensor update in milliseconds for Voltage and Power Sensor */
+#define ALS_REPORT_THRESHOLD 500            /**< sensor threshold in centilux */
+#define ANALOG_REFERENCE_VOLTAGE_MV 3300    /**< ADC reference voltage in millivolts */
+#define ANALOG_MIN 0                        /**< lower range of analog measurements. */
+#define ANALOG_MAX 1023                     /**< uppper range of analog measurements. */
 
 
-static bool              IsEnabled                = false;
-static volatile uint32_t PirTimestamp             = 0;
-static uint8_t           SensorServerPirIdx       = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerAlsIdx       = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerVoltCurrIdx  = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerPowEnergyIdx = INSTANCE_INDEX_UNKNOWN;
+static bool              IsEnabled                        = false;
+static volatile uint32_t PirTimestamp                     = 0;
+static uint8_t           SensorServerPirIdx               = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorServerAlsIdx               = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorServerCurrPreciseEnergyIdx = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorServerVoltPowIdx           = INSTANCE_INDEX_UNKNOWN;
 
 
 /**
@@ -86,7 +87,7 @@ static uint32_t ConvertFloatToPower(float power);
  * @param voltage   value
  * @return          encoded value
  */
-static uint32_t ConvertFloatToEnergy(float energy);
+static uint32_t ConvertFloatToPreciseEnergy(float energy);
 
 /**
  * Process PIR update
@@ -101,12 +102,12 @@ static void ProcessALS(void);
 /**
  * Process voltage, current update
  */
-static void ProcessVoltCurr(void);
+static void ProcessCurrPreciseEnergy(void);
 
 /**
  * Process power and energy update
  */
-static void ProcessPowEnergy(void);
+static void ProcessVoltPow(void);
 
 
 void SetSensorServerALSIdx(uint8_t idx)
@@ -129,24 +130,24 @@ uint8_t GetSensorServerPIRIdx(void)
     return SensorServerPirIdx;
 }
 
-void SetSensorServerVoltCurrIdx(uint8_t idx)
+void SetSensorServerCurrPreciseEnergyIdx(uint8_t idx)
 {
-    SensorServerVoltCurrIdx = idx;
+    SensorServerCurrPreciseEnergyIdx = idx;
 }
 
-uint8_t GetSensorServerVoltCurrIdx(void)
+uint8_t GetSensorServerCurrPreciseEnergyIdx(void)
 {
-    return SensorServerVoltCurrIdx;
+    return SensorServerCurrPreciseEnergyIdx;
 }
 
-void SetSensorServerPowEnergyIdx(uint8_t idx)
+void SetSensorServerVoltPowIdx(uint8_t idx)
 {
-    SensorServerPowEnergyIdx = idx;
+    SensorServerVoltPowIdx = idx;
 }
 
-uint8_t GetSensorServerPowEnergyIdx(void)
+uint8_t GetSensorServerVoltPowIdx(void)
 {
-    return SensorServerPowEnergyIdx;
+    return SensorServerVoltPowIdx;
 }
 
 void InterruptPIR(void)
@@ -167,10 +168,10 @@ void LoopSensorServer(void)
     if (!IsEnabled)
         return;
 
-    static unsigned long timestamp_pir        = 0;
-    static unsigned long timestamp_als        = 0;
-    static unsigned long timestamp_volt_curr  = 0;
-    static unsigned long timestamp_pow_energy = 0;
+    static unsigned long timestamp_pir         = 0;
+    static unsigned long timestamp_als         = 0;
+    static unsigned long timestamp_curr_energy = 0;
+    static unsigned long timestamp_volt_power  = 0;
 
     if (timestamp_pir + SENSOR_UPDATE_INTV_PIR < millis())
     {
@@ -182,15 +183,15 @@ void LoopSensorServer(void)
         timestamp_als = millis();
         ProcessALS();
     }
-    if (timestamp_volt_curr + SENSOR_UPDATE_INTV_VOLT_CURR < millis())
+    if (timestamp_curr_energy + SENSOR_UPDATE_INTV_CURR_ENERGY < millis())
     {
-        timestamp_volt_curr = millis();
-        ProcessVoltCurr();
+        timestamp_curr_energy = millis();
+        ProcessCurrPreciseEnergy();
     }
-    if (timestamp_pow_energy + SENSOR_UPDATE_INTV_POW_ENERGY < millis())
+    if (timestamp_volt_power + SENSOR_UPDATE_INTV_VOLT_POWER < millis())
     {
-        timestamp_pow_energy = millis();
-        ProcessPowEnergy();
+        timestamp_volt_power = millis();
+        ProcessVoltPow();
     }
 }
 
@@ -220,12 +221,17 @@ static void ProcessALS(void)
         uint32_t als_centilux   = als_millivolts * ALS_CONVERSION_COEFFICIENT;
 
         /*
-     * Sensor server can be configured to report on change. In one mode report is triggered by
-     * percentage change from the actual value. In case of small measurement, it can generate heavy traffic.
-     */
+        * Sensor server can be configured to report on change. In one mode report is triggered by
+        * percentage change from the actual value. In case of small measurement, it can generate heavy traffic.
+        */
         if (als_centilux < ALS_REPORT_THRESHOLD)
         {
             als_centilux = 0;
+        }
+
+        if (als_centilux > ALS_MAX_MODEL_VALUE)
+        {
+            als_centilux = ALS_MAX_MODEL_VALUE;
         }
 
         uint8_t als_buf[] = {
@@ -241,75 +247,74 @@ static void ProcessALS(void)
     }
 }
 
-static void ProcessVoltCurr(void)
+static void ProcessCurrPreciseEnergy(void)
 {
-    uint16_t voltage;
     uint16_t current;
-
-    const SDM_State_T *p_sdm_state = SDM_GetState();
-
-    if (p_sdm_state != NULL)
-    {
-        voltage = ConvertFloatToVoltage(p_sdm_state->voltage);
-        current = ConvertFloatToCurrent(p_sdm_state->current);
-    }
-    else
-    {
-        voltage = MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL;
-        current = MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL;
-    }
-
-    if (GetSensorServerVoltCurrIdx() != INSTANCE_INDEX_UNKNOWN)
-    {
-        uint8_t voltcurr_buf[] = {
-            SensorServerVoltCurrIdx,
-            lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
-            highByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
-            (uint8_t)voltage,
-            (uint8_t)(voltage >> 8),
-            lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-            highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-            (uint8_t)current,
-            (uint8_t)(current >> 8),
-        };
-        UART_SendSensorUpdateRequest(voltcurr_buf, sizeof(voltcurr_buf));
-    }
-}
-
-static void ProcessPowEnergy(void)
-{
-    uint32_t power;
     uint32_t energy;
 
     const SDM_State_T *p_sdm_state = SDM_GetState();
 
     if (p_sdm_state != NULL)
     {
-        power  = ConvertFloatToPower(p_sdm_state->active_power);
-        energy = ConvertFloatToEnergy(p_sdm_state->total_active_energy);
+        current = ConvertFloatToCurrent(p_sdm_state->current);
+        energy  = ConvertFloatToPreciseEnergy(p_sdm_state->total_active_energy);
     }
     else
     {
-        power  = MESH_PROPERTY_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL;
-        energy = MESH_PROPERTY_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL;
+        current = MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL;
+        energy  = MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL;
     }
 
-    if (GetSensorServerPowEnergyIdx() != INSTANCE_INDEX_UNKNOWN)
+    if (GetSensorServerCurrPreciseEnergyIdx() != INSTANCE_INDEX_UNKNOWN)
     {
-        uint8_t powenergy_buf[] = {
-            SensorServerPowEnergyIdx,
+        uint8_t currpreciseenergy_buf[] = {SensorServerCurrPreciseEnergyIdx,
+                                           lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+                                           highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+                                           (uint8_t)current,
+                                           (uint8_t)(current >> 8),
+                                           lowByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+                                           highByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+                                           (uint8_t)energy,
+                                           (uint8_t)(energy >> 8),
+                                           (uint8_t)(energy >> 16),
+                                           (uint8_t)(energy >> 24)};
+        UART_SendSensorUpdateRequest(currpreciseenergy_buf, sizeof(currpreciseenergy_buf));
+    }
+}
+
+static void ProcessVoltPow(void)
+{
+    uint16_t voltage;
+    uint32_t power;
+
+    const SDM_State_T *p_sdm_state = SDM_GetState();
+
+    if (p_sdm_state != NULL)
+    {
+        voltage = ConvertFloatToVoltage(p_sdm_state->voltage);
+        power   = ConvertFloatToPower(p_sdm_state->active_power);
+    }
+    else
+    {
+        voltage = MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL;
+        power   = MESH_PROPERTY_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL;
+    }
+
+    if (GetSensorServerVoltPowIdx() != INSTANCE_INDEX_UNKNOWN)
+    {
+        uint8_t voltpow_buf[] = {
+            SensorServerVoltPowIdx,
+            lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
+            highByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
+            (uint8_t)voltage,
+            (uint8_t)(voltage >> 8),
             lowByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
             highByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
             (uint8_t)power,
             (uint8_t)(power >> 8),
             (uint8_t)(power >> 16),
-            lowByte(MESH_PROPERTY_ID_TOTAL_DEVICE_ENERGY_USE),
-            highByte(MESH_PROPERTY_ID_TOTAL_DEVICE_ENERGY_USE),
-            (uint8_t)energy,
-            (uint8_t)(energy >> 8),
-            (uint8_t)(energy >> 16),
         };
-        UART_SendSensorUpdateRequest(powenergy_buf, sizeof(powenergy_buf));
+        UART_SendSensorUpdateRequest(voltpow_buf, sizeof(voltpow_buf));
     }
 }
 
@@ -328,7 +333,7 @@ static uint32_t ConvertFloatToPower(float power)
     return (uint32_t)(power * 10);
 }
 
-static uint32_t ConvertFloatToEnergy(float energy)
+static uint32_t ConvertFloatToPreciseEnergy(float energy)
 {
-    return (uint32_t)energy;
+    return (uint32_t)(energy * 1000);
 }

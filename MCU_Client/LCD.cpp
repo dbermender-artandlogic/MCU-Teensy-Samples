@@ -142,6 +142,16 @@ static LCD_Sensor_T LCD_EnergySensor = {
     .value_state           = SENSOR_VALUE_UNKNOWN,
 };
 
+static LCD_Sensor_T LCD_PreciseEnergySensor = {
+    .property = PRECISE_TOTAL_DEVICE_ENERGY_USE,
+    .value =
+        {
+            .precise_energy = 0,
+        },
+    .value_timestamp       = 0,
+    .value_expiration_time = LCD_ENERGY_VALUE_EXP_MS,
+    .value_state           = SENSOR_VALUE_UNKNOWN,
+};
 
 /*
  *  Display line of text on LCD screen
@@ -271,6 +281,22 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                                                ? SENSOR_VALUE_UNKNOWN
                                                : SENSOR_VALUE_ACTUAL;
             LCD_EnergySensor.value_timestamp = millis();
+            break;
+        }
+        case PRECISE_TOTAL_DEVICE_ENERGY_USE:
+        {
+            if (LCD_PreciseEnergySensor.value.precise_energy != sensorValue.precise_energy &&
+                LCD_CurrentScreen == SCREEN_TYPE_ENERGY_SENSORS)
+                LCD_NeedsUpdate = true;
+
+            LCD_PreciseEnergySensor.value.precise_energy = sensorValue.precise_energy;
+            LCD_PreciseEnergySensor.value_state          = ((sensorValue.precise_energy ==
+                                                    MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL) ||
+                                                   (sensorValue.precise_energy ==
+                                                    MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_NOT_VALID_VAL))
+                                                      ? SENSOR_VALUE_UNKNOWN
+                                                      : SENSOR_VALUE_ACTUAL;
+            LCD_PreciseEnergySensor.value_timestamp = millis();
             break;
         }
     }
@@ -413,14 +439,27 @@ static void DisplayScreen(uint8_t screenNum)
             DisplayLine(0, text);
 
             strcpy(text, "Energy:  ");
-            if (LCD_EnergySensor.value_state != SENSOR_VALUE_UNKNOWN)
+            if (LCD_EnergySensor.value_state != SENSOR_VALUE_UNKNOWN ||
+                LCD_PreciseEnergySensor.value_state != SENSOR_VALUE_UNKNOWN)
             {
-                if (LCD_EnergySensor.value_state == SENSOR_VALUE_EXPIRED)
-                    strcpy(text + strlen(text), "(");
-                itoa(LCD_EnergySensor.value.energy, text + strlen(text), 10);
-                strcpy(text + strlen(text), " kWh");
-                if (LCD_EnergySensor.value_state == SENSOR_VALUE_EXPIRED)
-                    strcpy(text + strlen(text), ")");
+                if (LCD_PreciseEnergySensor.value_timestamp > LCD_EnergySensor.value_timestamp)
+                {
+                    if (LCD_PreciseEnergySensor.value_state == SENSOR_VALUE_EXPIRED)
+                        strcpy(text + strlen(text), "(");
+                    itoa(LCD_PreciseEnergySensor.value.precise_energy, text + strlen(text), 10);
+                    strcpy(text + strlen(text), " Wh");
+                    if (LCD_PreciseEnergySensor.value_state == SENSOR_VALUE_EXPIRED)
+                        strcpy(text + strlen(text), ")");
+                }
+                else
+                {
+                    if (LCD_EnergySensor.value_state == SENSOR_VALUE_EXPIRED)
+                        strcpy(text + strlen(text), "(");
+                    itoa(LCD_EnergySensor.value.energy, text + strlen(text), 10);
+                    strcpy(text + strlen(text), " kWh");
+                    if (LCD_EnergySensor.value_state == SENSOR_VALUE_EXPIRED)
+                        strcpy(text + strlen(text), ")");
+                }
             }
             else
             {

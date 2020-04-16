@@ -268,6 +268,15 @@ static void MeshInternal_ProcessPresentInputVoltage(uint8_t *p_payload, size_t l
  */
 static void MeshInternal_ProcessTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr);
 
+/*
+ *  Process Precise Energy Sensor update
+ *
+ *  @param * p_payload    Pointer to message p_payload
+ *  @param len            Payload length
+ *  @param src_addr       Source address
+ */
+static void MeshInternal_ProcessPreciseTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr);
+
 
 bool Mesh_IsModelAvailable(uint8_t *p_payload, uint8_t len, uint16_t expected_model_id)
 {
@@ -683,6 +692,11 @@ static void MeshInternal_ProcessSensorProperty(uint16_t property_id, uint8_t *p_
             MeshInternal_ProcessTotalDeviceEnergyUse(p_payload, len, src_addr);
             break;
         }
+        case PRECISE_TOTAL_DEVICE_ENERGY_USE:
+        {
+            MeshInternal_ProcessPreciseTotalDeviceEnergyUse(p_payload, len, src_addr);
+            break;
+        }
         default:
         {
             INFO("Invalid property id\n");
@@ -765,8 +779,22 @@ static void MeshInternal_ProcessTotalDeviceEnergyUse(uint8_t *p_payload, size_t 
         return;
     }
 
-    SensorValue_T sensor_value = {.energy = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) |
-                                            ((uint32_t)p_payload[2] << 16)};
+    SensorValue_T sensor_value = {
+        .energy = (((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) | ((uint32_t)p_payload[2] << 16))};
 
     ProcessTotalDeviceEnergyUse(src_addr, sensor_value);
+}
+
+static void MeshInternal_ProcessPreciseTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr)
+{
+    if (len != 4)
+    {
+        INFO("Invalid Length Sensor Status message\n");
+        return;
+    }
+
+    SensorValue_T sensor_value = {.precise_energy = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) |
+                                                    ((uint32_t)p_payload[2] << 16) | ((uint32_t)p_payload[3] << 24)};
+
+    ProcessPreciseTotalDeviceEnergyUse(src_addr, sensor_value);
 }
