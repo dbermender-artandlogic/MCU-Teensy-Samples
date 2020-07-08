@@ -30,19 +30,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**< Defines maximum data length in frame */
 #define MAX_PAYLOAD_SIZE 127
 
-#if LOG_INFO_ENABLE == 1
-#define INFO(f_, ...) DEBUG_INTERFACE.printf((f_), ##__VA_ARGS__)
-#else
-#define INFO(f_, ...)
-#endif
-
-#if LOG_DEBUG_ENABLE == 1
-#define DEBUG(f_, ...) DEBUG_INTERFACE.printf((f_), ##__VA_ARGS__)
-#else
-#define DEBUG(f_, ...)
-#endif
-
-
 /*
  *  Setup UART hardware
  */

@@ -64,8 +64,8 @@ static const uint8_t pir_registration[] = {
 
     0x01,    //Number of sensors
 
-    lowByte(MESH_PROPERTY_ID_PRESENCE_DETECTED),
-    highByte(MESH_PROPERTY_ID_PRESENCE_DETECTED),
+    lowByte(MESH_PROP_ID_PRESENCE_DETECTED),
+    highByte(MESH_PROP_ID_PRESENCE_DETECTED),
     lowByte(PIR_POSITIVE_TOLERANCE),
     highByte(PIR_POSITIVE_TOLERANCE),
     lowByte(PIR_NEGATIVE_TOLERANCE),
@@ -81,8 +81,8 @@ static const uint8_t als_registration[] = {
 
     0x01,    //Number of sensors
 
-    lowByte(MESH_PROPERTY_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
-    highByte(MESH_PROPERTY_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
+    lowByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
+    highByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
     lowByte(ALS_POSITIVE_TOLERANCE),
     highByte(ALS_POSITIVE_TOLERANCE),
     lowByte(ALS_NEGATIVE_TOLERANCE),
@@ -98,8 +98,8 @@ static const uint8_t current_precise_energy_registration[] = {
 
     0x02,    //Number of sensors
 
-    lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-    highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+    lowByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
+    highByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
     lowByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
     highByte(CURRENT_SENSOR_POSITIVE_TOLERANCE),
     lowByte(CURRENT_SENSOR_NEGATIVE_TOLERANCE),
@@ -108,8 +108,8 @@ static const uint8_t current_precise_energy_registration[] = {
     CURRENT_SENSOR_MEASUREMENT_PERIOD,
     CURRENT_SENSOR_UPDATE_INTERVAL,
 
-    lowByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
-    highByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+    lowByte(MESH_PROP_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+    highByte(MESH_PROP_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
     lowByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
     highByte(ENERGY_SENSOR_POSITIVE_TOLERANCE),
     lowByte(ENERGY_SENSOR_NEGATIVE_TOLERANCE),
@@ -125,8 +125,8 @@ static const uint8_t voltage_power_registration[] = {
 
     0x02,    //Number of sensors
 
-    lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
-    highByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
+    lowByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
+    highByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
     lowByte(VOLTAGE_SENSOR_POSITIVE_TOLERANCE),
     highByte(VOLTAGE_SENSOR_POSITIVE_TOLERANCE),
     lowByte(VOLTAGE_SENSOR_NEGATIVE_TOLERANCE),
@@ -135,8 +135,8 @@ static const uint8_t voltage_power_registration[] = {
     VOLTAGE_SENSOR_MEASUREMENT_PERIOD,
     VOLTAGE_SENSOR_UPDATE_INTERVAL,
 
-    lowByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
-    highByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
+    lowByte(MESH_PROP_ID_PRESENT_DEVICE_INPUT_POWER),
+    highByte(MESH_PROP_ID_PRESENT_DEVICE_INPUT_POWER),
     lowByte(POWER_SENSOR_POSITIVE_TOLERANCE),
     highByte(POWER_SENSOR_POSITIVE_TOLERANCE),
     lowByte(POWER_SENSOR_NEGATIVE_TOLERANCE),
@@ -399,7 +399,7 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
         if (model_id == MESH_MODEL_ID_HEALTH_SERVER)
         {
             uint16_t current_model_id_instance_index = index / 2;
-            SetHealthServerIdx(current_model_id_instance_index);
+            SetHealthSrvIdx(current_model_id_instance_index);
         }
     }
 
@@ -438,7 +438,7 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
         return;
     }
 
-    if (GetHealthServerIdx() == INSTANCE_INDEX_UNKNOWN)
+    if (GetHealthSrvIdx() == INSTANCE_INDEX_UNKNOWN)
     {
         ModemState = MODEM_STATE_UNKNOWN;
         INFO("Health Server model id not found in init node message\n");

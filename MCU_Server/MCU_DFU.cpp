@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "CRC.h"
 #include "Config.h"
+#include "Flasher.h"
 #include "UARTProtocol.h"
 
 
@@ -41,6 +42,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define DFU_UNSUPPORTED_TYPE 0x07
 #define DFU_OPERATION_NOT_PERMITTED 0x08
 #define DFU_OPERATION_FAILED 0x0A
+#define DFU_FIRMWARE_ALREADY_UP_TO_DATE 0x80
 #define DFU_FIRMWARE_SUCCESSFULLY_UPDATED 0xFF
 
 #define DFU_STATUS_IN_PROGRESS 0x00
@@ -62,6 +64,11 @@ static uint8_t PageBuffer[MAX_PAGE_SIZE] = {0};
 static size_t  PageOffset                = 0;
 static size_t  PageSize                  = 0;
 
+
+/*
+ *  Validate Application Data
+ */
+static uint8_t MCU_DFU_AppData_Validate(uint8_t *p_app_data, uint8_t app_data_len);
 
 /*
  *  Clear DFU states
@@ -106,22 +113,14 @@ void ProcessDfuInitRequest(uint8_t *p_payload, uint8_t len)
     uint8_t  app_data_len = p_payload[index++];
     uint8_t *p_app_data   = p_payload + index;
 
-    if ((app_data_len != strlen(DFU_VALIDATION_STRING) ||
-         memcmp(p_app_data, DFU_VALIDATION_STRING, app_data_len) != 0) &&
-        (app_data_len != strlen(DFU_VALIDATION_IGNORE_STRING) ||
-         memcmp(p_app_data, DFU_VALIDATION_IGNORE_STRING, app_data_len) != 0))
+    uint8_t init_status = MCU_DFU_AppData_Validate(p_app_data, app_data_len);
+    if (init_status != DFU_SUCCESS)
     {
-        uint8_t init_status[] = {DFU_INVALID_OBJECT};
-        UART_SendDfuInitResponse(init_status, sizeof(init_status));
+        UART_SendDfuInitResponse(&init_status, sizeof(init_status));
 
         MCU_DFU_ClearStates();
 
-        INFO("DFU Init: Invalid app data: ");
-        for (size_t i = 0; i < SHA256_SIZE; i++)
-        {
-            INFO("%02X", p_app_data[i]);
-        }
-        INFO("\n\n");
+        INFO("DFU Rejected");
 
         return;
     }
@@ -283,13 +282,9 @@ void ProcessDfuPageStoreRequest(uint8_t *p_payload, uint8_t len)
         uint8_t response[] = {DFU_SUCCESS};
         UART_SendDfuPageStoreResponse(response, sizeof(response));
 
-        INFO("DFU Page store success, CRC %08X\n",
-             CalcCRC32((uint8_t *)Flasher_GetSpaceAddr(), FirmwareOffset, CRC_INIT_VAL));
+        uint32_t crc = CalcCRC32((uint8_t *)Flasher_GetSpaceAddr(), FirmwareOffset, CRC_INIT_VAL);
+        INFO("DFU Page store success, CRC %08X\n", crc);
         return;
-    }
-    else
-    {
-        DfuInProgress = 0;
     }
 
     uint8_t calculated_sha256[SHA256_SIZE];
@@ -312,7 +307,10 @@ void ProcessDfuPageStoreRequest(uint8_t *p_payload, uint8_t len)
     INFO("DFU Firmware updated\n");
     DEBUG_INTERFACE.flush();
 
-    Flasher_UpdateFirmware(FirmwareSize / 4);
+    size_t FwSizeWords = FirmwareSize / sizeof(uint32_t);
+
+    MCU_DFU_ClearStates();
+    Flasher_UpdateFirmware(FwSizeWords);
 
     //Should not get there
     for (;;)
@@ -340,6 +338,50 @@ void ProcessDfuCancelResponse(uint8_t *p_payload, uint8_t len)
 {
     MCU_DFU_ClearStates();
     INFO("DFU Cancelled\n");
+}
+
+static uint8_t MCU_DFU_AppData_Validate(uint8_t *p_app_data, uint8_t app_data_len)
+{
+    INFO("Application Data length: %d\n", app_data_len);
+    INFO("Application Data: ");
+    for (int i = 0; i < app_data_len; i++)
+    {
+        INFO("%02X", p_app_data[i]);
+    }
+    INFO("\n");
+
+    if (app_data_len == strlen(DFU_VALIDATION_IGNORE_STRING) &&
+        memcmp(p_app_data, DFU_VALIDATION_IGNORE_STRING, app_data_len) == 0)
+    {
+        /* Application Data contains special string that always validates the package */
+        return DFU_SUCCESS;
+    }
+
+    /* Valid Application Data is in format: DFU_VALIDATION_STRING/BUILD_NUMBER */
+    uint8_t *delimiter = (uint8_t *)memchr(p_app_data, '/', app_data_len);
+    if (delimiter == NULL)
+    {
+        /* Application Data does not contain delimiter */
+        return DFU_INVALID_OBJECT;
+    }
+    uint8_t *fw_type      = p_app_data;
+    uint8_t  fw_type_len  = delimiter - p_app_data;
+    uint8_t *fw_build     = &p_app_data[fw_type_len + 1];
+    uint8_t  fw_build_len = app_data_len - fw_type_len - 1;
+
+    if (strncmp((char *)fw_type, DFU_VALIDATION_STRING, fw_type_len) || (fw_type_len != strlen(DFU_VALIDATION_STRING)))
+    {
+        /* DFU package contains different type of firmware */
+        return DFU_INVALID_OBJECT;
+    }
+
+    if (!strncmp((char *)fw_build, BUILD_NUMBER, fw_build_len) && (fw_build_len == strlen(BUILD_NUMBER)))
+    {
+        /* Application Data contains the same firmware that exists on the device */
+        return DFU_FIRMWARE_ALREADY_UP_TO_DATE;
+    }
+
+    return DFU_SUCCESS;
 }
 
 

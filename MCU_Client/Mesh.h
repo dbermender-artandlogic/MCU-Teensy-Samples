@@ -34,7 +34,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MESH_MODEL_ID_GENERIC_ONOFF_CLIENT 0x1001
 #define MESH_MODEL_ID_SENSOR_CLIENT 0x1102
 #define MESH_MODEL_ID_GENERIC_LEVEL_CLIENT 0x1003
-#define MESH_MODEL_ID_LIGHT_LIGHTNESS_CLIENT 0x1302
+#define MESH_MODEL_ID_LIGHT_L_CLIENT 0x1302
 #define MESH_MODEL_ID_LIGHT_LC_CLIENT 0x1311
 #define MESH_MODEL_ID_LIGHT_CTL_CLIENT 0x1305
 
@@ -89,12 +89,12 @@ void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
  *  @param num_of_repeats      Number of message repeats.
  *  @param is_new_transaction  Is it a new transaction?
  */
-void Mesh_SendLightLightnessSet(uint8_t  instance_idx,
-                                uint16_t value,
-                                unsigned transition_time,
-                                unsigned delay_ms,
-                                uint8_t  num_of_repeats,
-                                bool     is_new_transaction);
+void Mesh_SendLightLSet(uint8_t  instance_idx,
+                        uint16_t value,
+                        unsigned transition_time,
+                        unsigned delay_ms,
+                        uint8_t  num_of_repeats,
+                        bool     is_new_transaction);
 
 /*
  *  Send Generic Delta Set Unacknowledged message with repeats.

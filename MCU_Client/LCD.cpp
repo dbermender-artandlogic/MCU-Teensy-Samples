@@ -227,7 +227,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                 LCD_NeedsUpdate = true;
 
             LCD_AlsSensor.value.als   = sensorValue.als;
-            LCD_AlsSensor.value_state = (sensorValue.als == MESH_PROPERTY_PRESENT_AMBIENT_LIGHT_LEVEL_UNKNOWN_VAL)
+            LCD_AlsSensor.value_state = (sensorValue.als == MESH_PROP_PRESENT_AMBIENT_LIGHT_LEVEL_UNKNOWN_VAL)
                                             ? SENSOR_VALUE_UNKNOWN
                                             : SENSOR_VALUE_ACTUAL;
             LCD_AlsSensor.value_timestamp = millis();
@@ -239,7 +239,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                 LCD_NeedsUpdate = true;
 
             LCD_PowerSensor.value.power = sensorValue.power;
-            LCD_PowerSensor.value_state = (sensorValue.power == MESH_PROPERTY_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL)
+            LCD_PowerSensor.value_state = (sensorValue.power == MESH_PROP_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL)
                                               ? SENSOR_VALUE_UNKNOWN
                                               : SENSOR_VALUE_ACTUAL;
             LCD_PowerSensor.value_timestamp = millis();
@@ -252,7 +252,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                 LCD_NeedsUpdate = true;
 
             LCD_CurrentSensor.value.current = sensorValue.current;
-            LCD_CurrentSensor.value_state   = (sensorValue.current == MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL)
+            LCD_CurrentSensor.value_state   = (sensorValue.current == MESH_PROP_PRESENT_INPUT_CURRENT_UNKNOWN_VAL)
                                                 ? SENSOR_VALUE_UNKNOWN
                                                 : SENSOR_VALUE_ACTUAL;
             LCD_CurrentSensor.value_timestamp = millis();
@@ -265,7 +265,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                 LCD_NeedsUpdate = true;
 
             LCD_VoltageSensor.value.voltage = sensorValue.voltage;
-            LCD_VoltageSensor.value_state   = (sensorValue.voltage == MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL)
+            LCD_VoltageSensor.value_state   = (sensorValue.voltage == MESH_PROP_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL)
                                                 ? SENSOR_VALUE_UNKNOWN
                                                 : SENSOR_VALUE_ACTUAL;
             LCD_VoltageSensor.value_timestamp = millis();
@@ -277,7 +277,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                 LCD_NeedsUpdate = true;
 
             LCD_EnergySensor.value.energy = sensorValue.energy;
-            LCD_EnergySensor.value_state  = (sensorValue.energy == MESH_PROPERTY_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL)
+            LCD_EnergySensor.value_state  = (sensorValue.energy == MESH_PROP_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL)
                                                ? SENSOR_VALUE_UNKNOWN
                                                : SENSOR_VALUE_ACTUAL;
             LCD_EnergySensor.value_timestamp = millis();
@@ -291,9 +291,9 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
 
             LCD_PreciseEnergySensor.value.precise_energy = sensorValue.precise_energy;
             LCD_PreciseEnergySensor.value_state          = ((sensorValue.precise_energy ==
-                                                    MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL) ||
+                                                    MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL) ||
                                                    (sensorValue.precise_energy ==
-                                                    MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_NOT_VALID_VAL))
+                                                    MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_NOT_VALID_VAL))
                                                       ? SENSOR_VALUE_UNKNOWN
                                                       : SENSOR_VALUE_ACTUAL;
             LCD_PreciseEnergySensor.value_timestamp = millis();

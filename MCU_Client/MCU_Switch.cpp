@@ -50,7 +50,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define GENERIC_LEVEL_MIN INT16_MIN     /**< Defines lower range of light lightness. */
 #define GENERIC_LEVEL_MAX INT16_MAX     /**< Defines upper range of light lightness. */
 #define GENERIC_LEVEL_MIN_CHANGE 0x200u /**< Defines the lowest reported changed. */
-#define GENERIC_LEVEL_INTVL_MS 50u      /**< Defines the shortest interval between two LightLightness messages. */
+#define GENERIC_LEVEL_INTVL_MS 50u      /**< Defines the shortest interval between two LightL messages. */
 
 /**
  * On Off communication properties

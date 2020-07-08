@@ -41,8 +41,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**
  * Light Lightness Controller Server configuration
  */
-#define DIMM_INTERRUPT_TIME_MS 5u /**< Dimming control interrupt interval definition [ms]. */
-#define DIMM_INTERRUPT_TIME_US (DIMM_INTERRUPT_TIME_MS * 1000)
+#define DIINTERRUPT_TIME_MS 5u /**< Dimming control interrupt interval definition [ms]. */
+#define DIINTERRUPT_TIME_US (DIINTERRUPT_TIME_MS * 1000)
 #define POW(a) ((a) * (a))
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -138,7 +138,7 @@ static Transition Temperature = {
 
 static bool          IsEnabled                       = false;
 static bool          CTLSupport                      = false;
-static uint8_t       LightLightnessServerIdx         = INSTANCE_INDEX_UNKNOWN;
+static uint8_t       LightLSrvIdx                    = INSTANCE_INDEX_UNKNOWN;
 static volatile bool AttentionLedState               = false;
 static bool          UnprovisionedSequenceEnableFlag = false;
 
@@ -279,7 +279,7 @@ void SetLightnessServerIdx(uint8_t idx)
 {
     if (!IsEnabled)
         return;
-    LightLightnessServerIdx = idx;
+    LightLSrvIdx = idx;
 }
 
 void SetLightCTLSupport(bool support)
@@ -291,7 +291,7 @@ void SetLightCTLSupport(bool support)
 
 uint8_t GetLightnessServerIdx(void)
 {
-    return LightLightnessServerIdx;
+    return LightLSrvIdx;
 }
 
 void IndicateAttentionLightness(bool attention_state, bool led_state)
@@ -333,7 +333,7 @@ void SetupLightnessServer(void)
     pinMode(PIN_PWM_WARM, OUTPUT);
     pinMode(PIN_PWM_COLD, OUTPUT);
     analogWriteResolution(PWM_RESOLUTION);
-    Timer1.initialize(DIMM_INTERRUPT_TIME_US);
+    Timer1.initialize(DIINTERRUPT_TIME_US);
     Timer1.attachInterrupt(DimmInterrupt);
 }
 
@@ -358,5 +358,5 @@ void SynchronizeLightness(void)
     if (!IsEnabled)
         return;
 
-    Mesh_SendLightLightnessGet(GetLightnessServerIdx());
+    Mesh_SendLightLGet(GetLightnessServerIdx());
 }

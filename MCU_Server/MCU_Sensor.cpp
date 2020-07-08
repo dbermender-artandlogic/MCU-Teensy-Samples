@@ -204,8 +204,8 @@ static void ProcessPIR(void)
 
         uint8_t pir_buf[] = {
             SensorServerPirIdx,
-            lowByte(MESH_PROPERTY_ID_PRESENCE_DETECTED),
-            highByte(MESH_PROPERTY_ID_PRESENCE_DETECTED),
+            lowByte(MESH_PROP_ID_PRESENCE_DETECTED),
+            highByte(MESH_PROP_ID_PRESENCE_DETECTED),
             pir,
         };
         UART_SendSensorUpdateRequest(pir_buf, sizeof(pir_buf));
@@ -236,8 +236,8 @@ static void ProcessALS(void)
 
         uint8_t als_buf[] = {
             SensorServerAlsIdx,
-            lowByte(MESH_PROPERTY_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
-            highByte(MESH_PROPERTY_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
+            lowByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
+            highByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
             (uint8_t)als_centilux,
             (uint8_t)(als_centilux >> 8),
             (uint8_t)(als_centilux >> 16),
@@ -261,19 +261,19 @@ static void ProcessCurrPreciseEnergy(void)
     }
     else
     {
-        current = MESH_PROPERTY_PRESENT_INPUT_CURRENT_UNKNOWN_VAL;
-        energy  = MESH_PROPERTY_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL;
+        current = MESH_PROP_PRESENT_INPUT_CURRENT_UNKNOWN_VAL;
+        energy  = MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL;
     }
 
     if (GetSensorServerCurrPreciseEnergyIdx() != INSTANCE_INDEX_UNKNOWN)
     {
         uint8_t currpreciseenergy_buf[] = {SensorServerCurrPreciseEnergyIdx,
-                                           lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
-                                           highByte(MESH_PROPERTY_ID_PRESENT_INPUT_CURRENT),
+                                           lowByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
+                                           highByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
                                            (uint8_t)current,
                                            (uint8_t)(current >> 8),
-                                           lowByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
-                                           highByte(MESH_PROPERTY_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+                                           lowByte(MESH_PROP_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
+                                           highByte(MESH_PROP_ID_PRECISE_TOTAL_DEVICE_ENERGY_USE),
                                            (uint8_t)energy,
                                            (uint8_t)(energy >> 8),
                                            (uint8_t)(energy >> 16),
@@ -296,20 +296,20 @@ static void ProcessVoltPow(void)
     }
     else
     {
-        voltage = MESH_PROPERTY_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL;
-        power   = MESH_PROPERTY_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL;
+        voltage = MESH_PROP_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL;
+        power   = MESH_PROP_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL;
     }
 
     if (GetSensorServerVoltPowIdx() != INSTANCE_INDEX_UNKNOWN)
     {
         uint8_t voltpow_buf[] = {
             SensorServerVoltPowIdx,
-            lowByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
-            highByte(MESH_PROPERTY_ID_PRESENT_INPUT_VOLTAGE),
+            lowByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
+            highByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
             (uint8_t)voltage,
             (uint8_t)(voltage >> 8),
-            lowByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
-            highByte(MESH_PROPERTY_ID_PRESENT_DEVICE_INPUT_POWER),
+            lowByte(MESH_PROP_ID_PRESENT_DEVICE_INPUT_POWER),
+            highByte(MESH_PROP_ID_PRESENT_DEVICE_INPUT_POWER),
             (uint8_t)power,
             (uint8_t)(power >> 8),
             (uint8_t)(power >> 16),

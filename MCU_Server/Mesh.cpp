@@ -30,10 +30,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**
  * Supported Mesh Opcodes definitions
  */
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_GET 0x824B
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_SET 0x824C
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_SET_UNACKNOWLEDGED 0x824D
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_STATUS 0x824E
+#define MESH_MESSAGE_LIGHT_L_GET 0x824B
+#define MESH_MESSAGE_LIGHT_L_SET 0x824C
+#define MESH_MESSAGE_LIGHT_L_SET_UNACKNOWLEDGED 0x824D
+#define MESH_MESSAGE_LIGHT_L_STATUS 0x824E
 #define MESH_MESSAGE_SENSOR_STATUS 0x0052
 #define MESH_MESSAGE_LEVEL_STATUS 0x8208
 #define MESH_MESSAGE_LIGHT_CTL_TEMPERATURE_STATUS 0x8266
@@ -42,7 +42,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**
  * Used Mesh Messages len
  */
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_GET_LEN 4
+#define MESH_MESSAGE_LIGHT_L_GET_LEN 4
 
 /*
  * Mesh time conversion definitions
@@ -62,7 +62,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /**
  * Property IDs description
  */
-#define PRESENCE_DETECTED_PROPERTY_ID 0x004D
+#define PRESENCE_DETECTED_PROP_ID 0x004D
 #define PRESENT_AMBIENT_LIGHT_LEVEL 0x004E
 
 
@@ -81,7 +81,7 @@ static bool MeshInternal_ConvertFromMeshFormatToMsTransitionTime(uint8_t time_me
  *  @param * p_payload   Pointer mesh message payload
  *  @param len           Payload length
  */
-static void MeshInternal_ProcessLightLightnessStatus(uint8_t *p_payload, size_t len);
+static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len);
 
 /*
  *  Process Generic Level Status mesh message
@@ -97,7 +97,7 @@ static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len);
  *  @param * p_payload   Pointer mesh message payload
  *  @param len           Payload length
  */
-static void MeshInternal_ProcessLightCTLTemperatureStatus(uint8_t *p_payload, size_t len);
+static void MeshInternal_ProcessLightCTLTempStatus(uint8_t *p_payload, size_t len);
 
 
 bool Mesh_IsModelAvailable(uint8_t *p_payload, uint8_t len, uint16_t expected_model_id)
@@ -126,9 +126,9 @@ void Mesh_ProcessMeshCommand(uint8_t *p_payload, size_t len)
     DEBUG("Process Mesh Command [%d %d 0x%02X]\n", instance_index, instance_subindex, mesh_cmd);
     switch (mesh_cmd)
     {
-        case MESH_MESSAGE_LIGHT_LIGHTNESS_STATUS:
+        case MESH_MESSAGE_LIGHT_L_STATUS:
         {
-            MeshInternal_ProcessLightLightnessStatus(p_payload + index, len - index);
+            MeshInternal_ProcessLightLStatus(p_payload + index, len - index);
             break;
         }
         case MESH_MESSAGE_LEVEL_STATUS:
@@ -138,27 +138,27 @@ void Mesh_ProcessMeshCommand(uint8_t *p_payload, size_t len)
         }
         case MESH_MESSAGE_LIGHT_CTL_TEMPERATURE_STATUS:
         {
-            MeshInternal_ProcessLightCTLTemperatureStatus(p_payload + index, len - index);
+            MeshInternal_ProcessLightCTLTempStatus(p_payload + index, len - index);
             break;
         }
     }
 }
 
-void Mesh_SendLightLightnessGet(uint8_t instance_idx)
+void Mesh_SendLightLGet(uint8_t instance_idx)
 {
-    uint8_t buf[MESH_MESSAGE_LIGHT_LIGHTNESS_GET_LEN];
+    uint8_t buf[MESH_MESSAGE_LIGHT_L_GET_LEN];
     size_t  index = 0;
 
     buf[index++] = instance_idx;
     buf[index++] = 0x00;
-    buf[index++] = lowByte(MESH_MESSAGE_LIGHT_LIGHTNESS_GET);
-    buf[index++] = highByte(MESH_MESSAGE_LIGHT_LIGHTNESS_GET);
+    buf[index++] = lowByte(MESH_MESSAGE_LIGHT_L_GET);
+    buf[index++] = highByte(MESH_MESSAGE_LIGHT_L_GET);
 
     UART_SendMeshMessageRequest(buf, sizeof(buf));
 }
 
 
-static void MeshInternal_ProcessLightLightnessStatus(uint8_t *p_payload, size_t len)
+static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len)
 {
     size_t   index = 0;
     uint16_t present_value;
@@ -223,7 +223,7 @@ static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len)
     ProcessTargetLightness(present_lightness, target_lightness, transition_time_ms);
 }
 
-static void MeshInternal_ProcessLightCTLTemperatureStatus(uint8_t *p_payload, size_t len)
+static void MeshInternal_ProcessLightCTLTempStatus(uint8_t *p_payload, size_t len)
 {
     size_t   index = 0;
     uint16_t present_temperature;

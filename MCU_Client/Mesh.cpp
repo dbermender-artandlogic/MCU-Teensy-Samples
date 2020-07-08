@@ -40,10 +40,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MESH_MESSAGE_GENERIC_LEVEL_STATUS 0x8208
 #define MESH_MESSAGE_GENERIC_DELTA_SET 0x8209
 #define MESH_MESSAGE_GENERIC_DELTA_SET_UNACKNOWLEDGED 0x820A
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_GET 0x824B
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_SET 0x824C
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_SET_UNACKNOWLEDGED 0x824D
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_STATUS 0x824E
+#define MESH_MESSAGE_LIGHT_L_GET 0x824B
+#define MESH_MESSAGE_LIGHT_L_SET 0x824C
+#define MESH_MESSAGE_LIGHT_L_SET_UNACKNOWLEDGED 0x824D
+#define MESH_MESSAGE_LIGHT_L_STATUS 0x824E
 #define MESH_MESSAGE_LIGHT_LC_MODE_GET 0x8291
 #define MESH_MESSAGE_LIGHT_LC_MODE_SET 0x8292
 #define MESH_MESSAGE_LIGHT_LC_MODE_SET_UNACKNOWLEDGED 0x8293
@@ -60,7 +60,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Used Mesh Messages len
  */
 #define MESH_MESSAGE_GENERIC_ONOFF_SET_LEN 8
-#define MESH_MESSAGE_LIGHT_LIGHTNESS_SET_LEN 9
+#define MESH_MESSAGE_LIGHT_L_SET_LEN 9
 #define MESH_MESSAGE_GENERIC_DELTA_SET_LEN 11
 #define MESH_MESSAGE_GENERIC_LEVEL_SET_LEN 9
 
@@ -86,9 +86,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SS_FORMAT_MASK 0x01
 #define SS_SHORT_LEN_MASK 0x1E
 #define SS_SHORT_LEN_OFFSET 1
-#define SS_SHORT_PROPERTY_ID_LOW_MASK 0xE0
-#define SS_SHORT_PROPERTY_ID_LOW_OFFSET 5
-#define SS_SHORT_PROPERTY_ID_HIGH_OFFSET 3
+#define SS_SHORT_PROP_ID_LOW_MASK 0xE0
+#define SS_SHORT_PROP_ID_LOW_OFFSET 5
+#define SS_SHORT_PROP_ID_HIGH_OFFSET 3
 #define SS_LONG_LEN_MASK 0xFE
 #define SS_LONG_LEN_OFFSET 1
 
@@ -97,7 +97,7 @@ typedef enum
 {
     GENERIC_ON_OFF_SET_MSG,
     GENERIC_DELTA_SET_MSG,
-    LIGHT_LIGHTNESS_SET_MSG,
+    LIGHT_L_SET_MSG,
     GENERIC_LEVEL_SET_MSG
 } MsgType_T;
 
@@ -123,7 +123,7 @@ typedef struct
     uint8_t  tid;
     uint8_t  transition_time;
     uint8_t  delay;
-} LightLightnessSetMsg_T;
+} LightLSetMsg_T;
 
 typedef struct
 {
@@ -164,7 +164,7 @@ static void MeshInternal_SendGenericOnOffSet(uint8_t instance_idx, GenericOnOffS
  *  @param delay_ms          Delay in miliseconds
  *  @param is_new            Is it a new transation?
  */
-static void MeshInternal_SendLightLightnessSet(uint8_t instance_idx, LightLightnessSetMsg_T *message);
+static void MeshInternal_SendLightLSet(uint8_t instance_idx, LightLSetMsg_T *message);
 
 /*
  *  Send Generic Level Set message
@@ -341,10 +341,10 @@ void Mesh_Loop(void)
                 MeshMsgsQueue[i] = NULL;
                 break;
             }
-            case LIGHT_LIGHTNESS_SET_MSG:
+            case LIGHT_L_SET_MSG:
             {
-                MeshInternal_SendLightLightnessSet(MeshMsgsQueue[i]->instance_idx,
-                                                   (LightLightnessSetMsg_T *)MeshMsgsQueue[i]->mesh_msg);
+                MeshInternal_SendLightLSet(MeshMsgsQueue[i]->instance_idx,
+                                           (LightLSetMsg_T *)MeshMsgsQueue[i]->mesh_msg);
                 free(MeshMsgsQueue[i]->mesh_msg);
                 free(MeshMsgsQueue[i]);
                 MeshMsgsQueue[i] = NULL;
@@ -401,12 +401,12 @@ void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
     }
 }
 
-void Mesh_SendLightLightnessSet(uint8_t  instance_idx,
-                                uint16_t value,
-                                unsigned transition_time,
-                                unsigned delay_ms,
-                                uint8_t  num_of_repeats,
-                                bool     is_new_transaction)
+void Mesh_SendLightLSet(uint8_t  instance_idx,
+                        uint16_t value,
+                        unsigned transition_time,
+                        unsigned delay_ms,
+                        uint8_t  num_of_repeats,
+                        bool     is_new_transaction)
 {
     static uint8_t tid = 0;
 
@@ -415,17 +415,17 @@ void Mesh_SendLightLightnessSet(uint8_t  instance_idx,
 
     for (int i = 0; i <= num_of_repeats; i++)
     {
-        LightLightnessSetMsg_T *p_msg = (LightLightnessSetMsg_T *)calloc(1, sizeof(LightLightnessSetMsg_T));
-        p_msg->lightness              = value;
-        p_msg->tid                    = tid;
-        p_msg->transition_time        = MeshInternal_ConvertFromMsToMeshFormat(transition_time);
-        p_msg->delay = ((num_of_repeats - i) * MESH_REPEATS_INTERVAL_MS + delay_ms) / MESH_DELAY_TIME_STEP_MS;
+        LightLSetMsg_T *p_msg  = (LightLSetMsg_T *)calloc(1, sizeof(LightLSetMsg_T));
+        p_msg->lightness       = value;
+        p_msg->tid             = tid;
+        p_msg->transition_time = MeshInternal_ConvertFromMsToMeshFormat(transition_time);
+        p_msg->delay           = ((num_of_repeats - i) * MESH_REPEATS_INTERVAL_MS + delay_ms) / MESH_DELAY_TIME_STEP_MS;
 
         EnqueuedMsg_T *p_enqueued_msg = (EnqueuedMsg_T *)calloc(1, sizeof(EnqueuedMsg_T));
         p_enqueued_msg->instance_idx  = instance_idx;
         p_enqueued_msg->mesh_msg      = p_msg;
         p_enqueued_msg->dispatch_time = millis() + i * MESH_REPEATS_INTERVAL_MS;
-        p_enqueued_msg->msg_type      = LIGHT_LIGHTNESS_SET_MSG;
+        p_enqueued_msg->msg_type      = LIGHT_L_SET_MSG;
 
         for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
         {
@@ -530,15 +530,15 @@ static void MeshInternal_SendGenericOnOffSet(uint8_t instance_idx, GenericOnOffS
     UART_SendMeshMessageRequest(buf, sizeof(buf));
 }
 
-static void MeshInternal_SendLightLightnessSet(uint8_t instance_idx, LightLightnessSetMsg_T *message)
+static void MeshInternal_SendLightLSet(uint8_t instance_idx, LightLSetMsg_T *message)
 {
-    uint8_t buf[MESH_MESSAGE_LIGHT_LIGHTNESS_SET_LEN];
+    uint8_t buf[MESH_MESSAGE_LIGHT_L_SET_LEN];
     size_t  index = 0;
 
     buf[index++] = instance_idx;
     buf[index++] = 0x00;
-    buf[index++] = lowByte(MESH_MESSAGE_LIGHT_LIGHTNESS_SET_UNACKNOWLEDGED);
-    buf[index++] = highByte(MESH_MESSAGE_LIGHT_LIGHTNESS_SET_UNACKNOWLEDGED);
+    buf[index++] = lowByte(MESH_MESSAGE_LIGHT_L_SET_UNACKNOWLEDGED);
+    buf[index++] = highByte(MESH_MESSAGE_LIGHT_L_SET_UNACKNOWLEDGED);
     buf[index++] = lowByte(message->lightness);
     buf[index++] = highByte(message->lightness);
     buf[index++] = message->tid;
@@ -648,9 +648,8 @@ static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
         {
             /* Length field in Sensor Status message is 0-based */
             size_t   message_len = ((p_payload[index] & SS_SHORT_LEN_MASK) >> SS_SHORT_LEN_OFFSET) + 1;
-            uint16_t property_id = (p_payload[index++] & SS_SHORT_PROPERTY_ID_LOW_MASK) >>
-                                   SS_SHORT_PROPERTY_ID_LOW_OFFSET;
-            property_id |= ((uint16_t)p_payload[index++]) << SS_SHORT_PROPERTY_ID_HIGH_OFFSET;
+            uint16_t property_id = (p_payload[index++] & SS_SHORT_PROP_ID_LOW_MASK) >> SS_SHORT_PROP_ID_LOW_OFFSET;
+            property_id |= ((uint16_t)p_payload[index++]) << SS_SHORT_PROP_ID_HIGH_OFFSET;
 
             MeshInternal_ProcessSensorProperty(property_id, p_payload + index, message_len, src_addr);
             index += message_len;

@@ -27,8 +27,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdint.h>
 
 
+#ifndef CMAKE_UNIT_TEST
 #ifndef __MKL26Z64__
 #error "Flash support available only on MKL26Z64"
+#endif
 #endif
 
 /**< RAMFUNC attribute definition. Used to place function in RAM */

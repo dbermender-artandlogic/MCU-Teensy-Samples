@@ -48,11 +48,11 @@ void LoopHealth(void);
 /*
  * Set index of registered Health Server model
  */
-void SetHealthServerIdx(uint8_t idx);
+void SetHealthSrvIdx(uint8_t idx);
 
 /*
  * Get index of registered Health Server model
  */
-uint8_t GetHealthServerIdx(void);
+uint8_t GetHealthSrvIdx(void);
 
 #endif    // MCU_HEALTH_H

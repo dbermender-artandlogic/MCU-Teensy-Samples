@@ -51,7 +51,7 @@ static volatile bool Fault      = false; /**< Implies if Fault button has been p
 static volatile bool Connection = false; /**< Implies if Connection button has been pushed */
 static bool          FaultState = false; /**< Holds Fault state. True if fault is set and false if fault is cleared */
 static bool ConnectionState = true; /**< Holds Connection state. True if UART connection is up and false if it is down */
-static uint8_t  HealthServerIdx    = INSTANCE_INDEX_UNKNOWN; /**  Index of registered Health Server model */
+static uint8_t  HealthSrvIdx       = INSTANCE_INDEX_UNKNOWN; /**  Index of registered Health Server model */
 static bool     TestStarted        = false;                  /**  True, if test is started. */
 static uint32_t TestStartTimestamp = 0;                      /**  Time left to finish test.*/
 static uint8_t  TestStartPayload[TEST_MSG_LEN];              /**  Current test payload.*/
@@ -171,11 +171,11 @@ void LoopHealth(void)
 
         if (FaultState)
         {
-            MCU_Health_SendSetFaultRequest(SILVAIR_ID, EXAMPLE_FAULT_ID, HealthServerIdx);
+            MCU_Health_SendSetFaultRequest(SILVAIR_ID, EXAMPLE_FAULT_ID, HealthSrvIdx);
         }
         else
         {
-            MCU_Health_SendClearFaultRequest(SILVAIR_ID, EXAMPLE_FAULT_ID, HealthServerIdx);
+            MCU_Health_SendClearFaultRequest(SILVAIR_ID, EXAMPLE_FAULT_ID, HealthSrvIdx);
         }
     }
 
@@ -209,12 +209,12 @@ void LoopHealth(void)
     }
 }
 
-void SetHealthServerIdx(uint8_t idx)
+void SetHealthSrvIdx(uint8_t idx)
 {
-    HealthServerIdx = idx;
+    HealthSrvIdx = idx;
 }
 
-uint8_t GetHealthServerIdx(void)
+uint8_t GetHealthSrvIdx(void)
 {
-    return HealthServerIdx;
+    return HealthSrvIdx;
 }
