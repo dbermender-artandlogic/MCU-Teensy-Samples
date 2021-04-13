@@ -35,7 +35,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PIN_PIR 5  /**< PIR sensor location */
 #define PIN_ALS 17 /**< ALS sensor location */
 
-#define ALS_CONVERSION_COEFFICIENT 5UL      /**< light sensor coefficient [centilux / millivolt] */
+#define ALS_CONVERSION_COEFFICIENT 14UL     /**< light sensor coefficient [centilux / millivolt] */
 #define ALS_MAX_MODEL_VALUE (0xFFFFFF - 1)  /**<  Maximal allowed value of ALS reading passed to model */
 #define PIR_DEBOUNCE_TIME_MS 20             /**< Maximal PIR debounce time in milliseconds */
 #define PIR_INERTIA_MS 4000                 /**< PIR inertia in milliseconds */

@@ -59,7 +59,7 @@ void AttentionStateSet(bool state)
 {
     AttentionToggleTimestamp = millis();
     AttentionState           = state;
-    AttentionLedValue        = state;
+    AttentionLedValue        = false;
     digitalWrite(PIN_LED_STATUS, AttentionLedValue);
 }
 
