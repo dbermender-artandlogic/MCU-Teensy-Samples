@@ -55,4 +55,22 @@ void SetHealthSrvIdx(uint8_t idx);
  */
 uint8_t GetHealthSrvIdx(void);
 
+/*
+ *  Send Health Set Fault Request
+ *
+ *  @param company_id      Company id
+ *  @param fault_id        Fault id
+ *  @param instance_idx    Instance index
+ */
+void MCU_Health_SendSetFaultRequest(uint16_t company_id, uint8_t fault_id, uint8_t instance_idx);
+
+/*
+ *  Send Health Clear Fault Request
+ *
+ *  @param company_id      Company id
+ *  @param fault_id        Fault id
+ *  @param instance_idx    Instance index
+ */
+void MCU_Health_SendClearFaultRequest(uint16_t company_id, uint8_t fault_id, uint8_t instance_idx);
+
 #endif    // MCU_HEALTH_H

@@ -20,20 +20,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 
-#include "MCU_Sensor.h"
+#include "SensorInput.h"
 
 #include <TimerOne.h>
 #include <TimerThree.h>
 #include <math.h>
 
-#include "Config.h"
+#include "Log.h"
 #include "Mesh.h"
 #include "SDM.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
-
-
-#define PIN_PIR 5  /**< PIR sensor location */
-#define PIN_ALS 17 /**< ALS sensor location */
 
 #define ALS_CONVERSION_COEFFICIENT 14UL     /**< light sensor coefficient [centilux / millivolt] */
 #define ALS_MAX_MODEL_VALUE (0xFFFFFF - 1)  /**<  Maximal allowed value of ALS reading passed to model */
@@ -49,12 +46,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define ANALOG_MAX 1023                     /**< uppper range of analog measurements. */
 
 
-static bool              IsEnabled                        = false;
-static volatile uint32_t PirTimestamp                     = 0;
-static uint8_t           SensorServerPirIdx               = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerAlsIdx               = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerCurrPreciseEnergyIdx = INSTANCE_INDEX_UNKNOWN;
-static uint8_t           SensorServerVoltPowIdx           = INSTANCE_INDEX_UNKNOWN;
+static bool              IsEnabled                       = false;
+static volatile uint32_t PirTimestamp                    = 0;
+static uint8_t           SensorInputPirIdx               = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorInputAlsIdx               = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorInputCurrPreciseEnergyIdx = INSTANCE_INDEX_UNKNOWN;
+static uint8_t           SensorInputVoltPowIdx           = INSTANCE_INDEX_UNKNOWN;
 
 
 /**
@@ -110,52 +107,52 @@ static void ProcessCurrPreciseEnergy(void);
 static void ProcessVoltPow(void);
 
 
-void SetSensorServerALSIdx(uint8_t idx)
+void SensorInput_SetAlsIdx(uint8_t idx)
 {
-    SensorServerAlsIdx = idx;
+    SensorInputAlsIdx = idx;
 }
 
-uint8_t GetSensorServerALSIdx(void)
+uint8_t SensorInput_GetAlsIdx(void)
 {
-    return SensorServerAlsIdx;
+    return SensorInputAlsIdx;
 }
 
-void SetSensorServerPIRIdx(uint8_t idx)
+void SensorInput_SetPirIdx(uint8_t idx)
 {
-    SensorServerPirIdx = idx;
+    SensorInputPirIdx = idx;
 }
 
-uint8_t GetSensorServerPIRIdx(void)
+uint8_t SensorInput_GetPirIdx(void)
 {
-    return SensorServerPirIdx;
+    return SensorInputPirIdx;
 }
 
-void SetSensorServerCurrPreciseEnergyIdx(uint8_t idx)
+void SensorInput_SetCurrPreciseEnergyIdx(uint8_t idx)
 {
-    SensorServerCurrPreciseEnergyIdx = idx;
+    SensorInputCurrPreciseEnergyIdx = idx;
 }
 
-uint8_t GetSensorServerCurrPreciseEnergyIdx(void)
+uint8_t SensorInput_GetCurrPreciseEnergyIdx(void)
 {
-    return SensorServerCurrPreciseEnergyIdx;
+    return SensorInputCurrPreciseEnergyIdx;
 }
 
-void SetSensorServerVoltPowIdx(uint8_t idx)
+void SensorInput_SetVoltPowIdx(uint8_t idx)
 {
-    SensorServerVoltPowIdx = idx;
+    SensorInputVoltPowIdx = idx;
 }
 
-uint8_t GetSensorServerVoltPowIdx(void)
+uint8_t SensorInput_GetVoltPowIdx(void)
 {
-    return SensorServerVoltPowIdx;
+    return SensorInputVoltPowIdx;
 }
 
 void InterruptPIR(void)
 {
-    PirTimestamp = millis();
+    PirTimestamp = Timestamp_GetCurrent();
 }
 
-void SetupSensorServer(void)
+void SensorInput_Setup(void)
 {
     pinMode(PIN_PIR, INPUT);
 
@@ -163,7 +160,7 @@ void SetupSensorServer(void)
     IsEnabled = true;
 }
 
-void LoopSensorServer(void)
+void SensorInput_Loop(void)
 {
     if (!IsEnabled)
         return;
@@ -173,24 +170,24 @@ void LoopSensorServer(void)
     static unsigned long timestamp_curr_energy = 0;
     static unsigned long timestamp_volt_power  = 0;
 
-    if (timestamp_pir + SENSOR_UPDATE_INTV_PIR < millis())
+    if (Timestamp_GetTimeElapsed(timestamp_pir, Timestamp_GetCurrent()) >= SENSOR_UPDATE_INTV_PIR)
     {
-        timestamp_pir = millis();
+        timestamp_pir = Timestamp_GetCurrent();
         ProcessPIR();
     }
-    if (timestamp_als + SENSOR_UPDATE_INTV_ALS < millis())
+    if (Timestamp_GetTimeElapsed(timestamp_als, Timestamp_GetCurrent()) >= SENSOR_UPDATE_INTV_ALS)
     {
-        timestamp_als = millis();
+        timestamp_als = Timestamp_GetCurrent();
         ProcessALS();
     }
-    if (timestamp_curr_energy + SENSOR_UPDATE_INTV_CURR_ENERGY < millis())
+    if (Timestamp_GetTimeElapsed(timestamp_curr_energy, Timestamp_GetCurrent()) >= SENSOR_UPDATE_INTV_CURR_ENERGY)
     {
-        timestamp_curr_energy = millis();
+        timestamp_curr_energy = Timestamp_GetCurrent();
         ProcessCurrPreciseEnergy();
     }
-    if (timestamp_volt_power + SENSOR_UPDATE_INTV_VOLT_POWER < millis())
+    if (Timestamp_GetTimeElapsed(timestamp_volt_power, Timestamp_GetCurrent()) >= SENSOR_UPDATE_INTV_VOLT_POWER)
     {
-        timestamp_volt_power = millis();
+        timestamp_volt_power = Timestamp_GetCurrent();
         ProcessVoltPow();
     }
 }
@@ -198,12 +195,13 @@ void LoopSensorServer(void)
 
 static void ProcessPIR(void)
 {
-    if (GetSensorServerPIRIdx() != INSTANCE_INDEX_UNKNOWN)
+    if (SensorInput_GetPirIdx() != INSTANCE_INDEX_UNKNOWN)
     {
-        bool pir = digitalRead(PIN_PIR) || (millis() < (PirTimestamp + PIR_INERTIA_MS));
+        bool pir = digitalRead(PIN_PIR) ||
+                   (Timestamp_GetTimeElapsed(PirTimestamp, Timestamp_GetCurrent()) < PIR_INERTIA_MS);
 
         uint8_t pir_buf[] = {
-            SensorServerPirIdx,
+            SensorInputPirIdx,
             lowByte(MESH_PROP_ID_PRESENCE_DETECTED),
             highByte(MESH_PROP_ID_PRESENCE_DETECTED),
             pir,
@@ -214,14 +212,14 @@ static void ProcessPIR(void)
 
 static void ProcessALS(void)
 {
-    if (GetSensorServerALSIdx() != INSTANCE_INDEX_UNKNOWN)
+    if (SensorInput_GetAlsIdx() != INSTANCE_INDEX_UNKNOWN)
     {
         uint32_t als_adc_val    = analogRead(PIN_ALS);
         uint32_t als_millivolts = (als_adc_val * ANALOG_REFERENCE_VOLTAGE_MV) / ANALOG_MAX;
         uint32_t als_centilux   = als_millivolts * ALS_CONVERSION_COEFFICIENT;
 
         /*
-        * Sensor server can be configured to report on change. In one mode report is triggered by
+        * Sensor Server can be configured to report on change. In one mode report is triggered by
         * percentage change from the actual value. In case of small measurement, it can generate heavy traffic.
         */
         if (als_centilux < ALS_REPORT_THRESHOLD)
@@ -235,7 +233,7 @@ static void ProcessALS(void)
         }
 
         uint8_t als_buf[] = {
-            SensorServerAlsIdx,
+            SensorInputAlsIdx,
             lowByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
             highByte(MESH_PROP_ID_PRESENT_AMBIENT_LIGHT_LEVEL),
             (uint8_t)als_centilux,
@@ -265,9 +263,9 @@ static void ProcessCurrPreciseEnergy(void)
         energy  = MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL;
     }
 
-    if (GetSensorServerCurrPreciseEnergyIdx() != INSTANCE_INDEX_UNKNOWN)
+    if (SensorInput_GetCurrPreciseEnergyIdx() != INSTANCE_INDEX_UNKNOWN)
     {
-        uint8_t currpreciseenergy_buf[] = {SensorServerCurrPreciseEnergyIdx,
+        uint8_t currpreciseenergy_buf[] = {SensorInputCurrPreciseEnergyIdx,
                                            lowByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
                                            highByte(MESH_PROP_ID_PRESENT_INPUT_CURRENT),
                                            (uint8_t)current,
@@ -300,10 +298,10 @@ static void ProcessVoltPow(void)
         power   = MESH_PROP_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL;
     }
 
-    if (GetSensorServerVoltPowIdx() != INSTANCE_INDEX_UNKNOWN)
+    if (SensorInput_GetVoltPowIdx() != INSTANCE_INDEX_UNKNOWN)
     {
         uint8_t voltpow_buf[] = {
-            SensorServerVoltPowIdx,
+            SensorInputVoltPowIdx,
             lowByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
             highByte(MESH_PROP_ID_PRESENT_INPUT_VOLTAGE),
             (uint8_t)voltage,

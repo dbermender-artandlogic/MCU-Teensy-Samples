@@ -1,16 +1,16 @@
 /*
-Copyright © 2021 Silvair Sp. z o.o. All Rights Reserved.
-
+Copyright © 2017 Silvair Sp. z o.o. All Rights Reserved.
+ 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
 of the Software, and to permit persons to whom the Software is furnished
 to do so, subject to the following conditions:
-
+ 
 The above copyright notice and this permission notice shall be included
 in all copies or substantial portions of the Software.
-
+ 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
@@ -19,41 +19,42 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef UARTDRIVER_H
-#define UARTDRIVER_H
+#ifndef RTC_H_
+#define RTC_H_
 
-#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 
-/*
- *  Initialize UART Driver.
- */
-void UARTDriver_Init(void);
+#define RTC_WITH_BATTERY_ATTACHED 0x03
+#define RTC_WITHOUT_BATTERY_ATTACHED 0x01
+#define RTC_NOT_ATTACHED 0x00
 
-/*
- *  Write bytes from table to transmit buffer.
- *
- *  @param table        pointer to table with bytes that 
- *                      you want to write to transmit buffer 
- *  @param len          length of table
- *  
- *  @return             False if overflow in TX buffer occured, true otherwise
- */
-bool UARTDriver_WriteBytes(uint8_t *table, uint16_t len);
+struct __attribute__((packed)) TimeDate
+{
+    uint16_t year;
+    uint8_t  month;
+    uint8_t  day;
+    uint8_t  hour;
+    uint8_t  minute;
+    uint8_t  seconds;
+    uint16_t milliseconds;
+};
 
-/*
- *  Read Byte from Receive Buffer.
- *
- *  @param read_byte        pointer for received byte 
- *  
- *  @return                 False if RX buffer is empty, true otherwise 
- */
-bool UARTDriver_ReadByte(uint8_t *read_byte);
+typedef void (*SendTimeSourceGetRespCallback)(uint8_t, TimeDate *);
+typedef void (*SendTimeSourceSetRespCallback)(uint8_t);
 
-/*
- *  Function for polling received bytes from UART DMA buffer
- */
-void UARTDriver_RxDMAPoll(void);
+bool RTC_Init(SendTimeSourceGetRespCallback get_resp_callback, SendTimeSourceSetRespCallback set_resp_callback);
 
-#endif    //UARTDRIVER_H
+void RTC_SetTime(TimeDate *time);
+
+void RTC_GetTime(void);
+
+bool RTC_IsBatteryDetected(void);
+
+void SetTimeServerInstanceIdx(uint8_t instance_index);
+
+uint8_t GetTimeServerInstanceIdx(void);
+
+void LoopRTC(void);
+
+#endif    // RTC_H_

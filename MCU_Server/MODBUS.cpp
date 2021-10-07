@@ -24,7 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "CRC.h"
 #include "Config.h"
-
+#include "Log.h"
 
 #define MIN_RX_MODBUS_MESSAGE_LEN 4u
 #define MAX_RX_MODBUS_MESSAGE_LEN 255u
@@ -157,13 +157,13 @@ void MODBUS_ProcessIncoming(void)
         {
             case MODBUS_SLAVE_ADDR_OFFSET:
             {
-                DEBUG("Received slave address\n");
+                LOG_DEBUG("Received slave address");
                 state.already_received++;
                 break;
             }
             case MODBUS_FUNCTION_CODE_OFFSET:
             {
-                DEBUG("Received function code\n");
+                LOG_DEBUG("Received function code");
                 if (MODBUS_IsFunctionCodeSupported(state.payload[MODBUS_FUNCTION_CODE_OFFSET]))
                     state.already_received++;
                 else
@@ -176,14 +176,14 @@ void MODBUS_ProcessIncoming(void)
                 state.already_received++;
                 state.expected_len = MODBUS_ExpectedMessageLen(state.payload[MODBUS_FUNCTION_CODE_OFFSET],
                                                                state.payload[MODBUS_PAYLOAD_START_OFFSET]);
-                DEBUG("Received first payload byte, expected len: %d\n", state.expected_len);
+                LOG_DEBUG("Received first payload byte, expected len: %d", state.expected_len);
                 break;
             }
             default:
             {
                 if (state.expected_len > state.already_received)
                 {
-                    DEBUG("Received next payload byte\n");
+                    LOG_DEBUG("Received next payload byte");
                     state.already_received++;
                 }
 
@@ -250,7 +250,7 @@ void MODBUS_SendPresetMultipleRegisters(uint8_t   slave_address,
 
 static void MODBUS_ProcessResponse(MODBUS_Frame_T *p_frame)
 {
-    DEBUG("Process function code: %02X\n", p_frame->function_code);
+    LOG_DEBUG("Process function code: %02X", p_frame->function_code);
 
     switch (p_frame->function_code)
     {
@@ -364,7 +364,7 @@ static bool MODBUS_IsValidMessage(uint8_t *buffer, size_t len)
     uint16_t actual_crc   = buffer[len - 1];
     actual_crc |= (uint16_t)buffer[len - 2] << 8;
 
-    DEBUG("Expected CRC: %04X, actual CRC: %04X\n", expected_crc, actual_crc);
+    LOG_DEBUG("Expected CRC: %04X, actual CRC: %04X", expected_crc, actual_crc);
 
     return expected_crc == actual_crc;
 }
@@ -447,12 +447,12 @@ static void MODBUS_ProcessFrame(uint8_t *payload, size_t len)
         frame.len           = len - index;
         frame.p_payload     = payload + index;
 
-        DEBUG("Received MODBUS frame.\n");
+        LOG_DEBUG("Received MODBUS frame");
 
         MODBUS_ProcessResponse(&frame);
     }
     else
     {
-        DEBUG("Message not valid\n");
+        LOG_DEBUG("Message not valid");
     }
 }

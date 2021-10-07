@@ -19,41 +19,18 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef UARTDRIVER_H
-#define UARTDRIVER_H
+#include "Log.h"
 
-#include <inttypes.h>
-#include <stddef.h>
-#include <stdint.h>
+void _LOG_HEXBUF(const char *text, const void *buf, size_t len)
+{
+    _PRINTF(text);
+    _PRINTF("\n");
 
-/*
- *  Initialize UART Driver.
- */
-void UARTDriver_Init(void);
+    uint8_t *hex_buff = (uint8_t *)buf;
+    for (size_t i = 0; i < len; i++)
+    {
+        _PRINTF("%02X ", hex_buff[i]);
+    }
 
-/*
- *  Write bytes from table to transmit buffer.
- *
- *  @param table        pointer to table with bytes that 
- *                      you want to write to transmit buffer 
- *  @param len          length of table
- *  
- *  @return             False if overflow in TX buffer occured, true otherwise
- */
-bool UARTDriver_WriteBytes(uint8_t *table, uint16_t len);
-
-/*
- *  Read Byte from Receive Buffer.
- *
- *  @param read_byte        pointer for received byte 
- *  
- *  @return                 False if RX buffer is empty, true otherwise 
- */
-bool UARTDriver_ReadByte(uint8_t *read_byte);
-
-/*
- *  Function for polling received bytes from UART DMA buffer
- */
-void UARTDriver_RxDMAPoll(void);
-
-#endif    //UARTDRIVER_H
+    _PRINTF("\n");
+}

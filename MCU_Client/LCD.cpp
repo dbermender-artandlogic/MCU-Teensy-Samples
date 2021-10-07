@@ -25,8 +25,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Arduino.h"
 #include "Config.h"
 #include "LiquidCrystal_I2C.h"
+#include "Log.h"
+#include "MeshTime.h"
+#include "TAILocalTimeConverter.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
-
 
 #define LCD_SCREEN_SWITCH_INTV_MS 5000 /**< Defines LCD screen switch interval. */
 #define LCD_ROWS_NUMBER 4              /**< Defines number of LCD rows. */
@@ -39,6 +42,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define LCD_VOLTAGE_VALUE_EXP_MS 60000 /**< Voltage Sensor value expiration time in milliseconds. */
 #define LCD_ENERGY_VALUE_EXP_MS 60000  /**< Energy Sensor value expiration time in milliseconds. */
 
+#define LCD_DATE_AND_TIME_UPDATE_PERIOD_MS 1000 /**< Date and Time displayed time update in milliseconds. */
+
 
 typedef enum
 {
@@ -47,7 +52,8 @@ typedef enum
     SCREEN_TYPE_ENERGY_SENSORS,
     SCREEN_TYPE_FW_VERSION,
     SCREEN_TYPE_DFU,
-    SCREEN_TYPE_LAST = SCREEN_TYPE_DFU,
+    SCREEN_TYPE_DATE_AND_TIME,
+    SCREEN_TYPE_LAST = SCREEN_TYPE_DATE_AND_TIME,
 } ScreenType_T;
 
 
@@ -178,6 +184,11 @@ static void ScreenIterate(void);
  */
 static void CheckSensorValuesExpiration(void);
 
+/*
+ *  Check if Time Display needs to be updated
+ */
+static void CheckTimeDisplayNeedUpdate(void);
+
 
 void LCD_Setup(void)
 {
@@ -218,7 +229,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
 
             LCD_PirSensor.value.pir       = sensorValue.pir;
             LCD_PirSensor.value_state     = SENSOR_VALUE_ACTUAL;
-            LCD_PirSensor.value_timestamp = millis();
+            LCD_PirSensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case PRESENT_AMBIENT_LIGHT_LEVEL:
@@ -230,7 +241,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
             LCD_AlsSensor.value_state = (sensorValue.als == MESH_PROP_PRESENT_AMBIENT_LIGHT_LEVEL_UNKNOWN_VAL)
                                             ? SENSOR_VALUE_UNKNOWN
                                             : SENSOR_VALUE_ACTUAL;
-            LCD_AlsSensor.value_timestamp = millis();
+            LCD_AlsSensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case PRESENT_DEVICE_INPUT_POWER:
@@ -242,7 +253,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
             LCD_PowerSensor.value_state = (sensorValue.power == MESH_PROP_PRESENT_DEVICE_INPUT_POWER_UNKNOWN_VAL)
                                               ? SENSOR_VALUE_UNKNOWN
                                               : SENSOR_VALUE_ACTUAL;
-            LCD_PowerSensor.value_timestamp = millis();
+            LCD_PowerSensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case PRESENT_INPUT_CURRENT:
@@ -255,7 +266,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
             LCD_CurrentSensor.value_state   = (sensorValue.current == MESH_PROP_PRESENT_INPUT_CURRENT_UNKNOWN_VAL)
                                                 ? SENSOR_VALUE_UNKNOWN
                                                 : SENSOR_VALUE_ACTUAL;
-            LCD_CurrentSensor.value_timestamp = millis();
+            LCD_CurrentSensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case PRESENT_INPUT_VOLTAGE:
@@ -268,7 +279,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
             LCD_VoltageSensor.value_state   = (sensorValue.voltage == MESH_PROP_PRESENT_INPUT_VOLTAGE_UNKNOWN_VAL)
                                                 ? SENSOR_VALUE_UNKNOWN
                                                 : SENSOR_VALUE_ACTUAL;
-            LCD_VoltageSensor.value_timestamp = millis();
+            LCD_VoltageSensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case TOTAL_DEVICE_ENERGY_USE:
@@ -280,7 +291,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
             LCD_EnergySensor.value_state  = (sensorValue.energy == MESH_PROP_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL)
                                                ? SENSOR_VALUE_UNKNOWN
                                                : SENSOR_VALUE_ACTUAL;
-            LCD_EnergySensor.value_timestamp = millis();
+            LCD_EnergySensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
         case PRECISE_TOTAL_DEVICE_ENERGY_USE:
@@ -296,7 +307,7 @@ void LCD_UpdateSensorValue(SensorProperty_T sensorProperty, SensorValue_T sensor
                                                     MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_NOT_VALID_VAL))
                                                       ? SENSOR_VALUE_UNKNOWN
                                                       : SENSOR_VALUE_ACTUAL;
-            LCD_PreciseEnergySensor.value_timestamp = millis();
+            LCD_PreciseEnergySensor.value_timestamp = Timestamp_GetCurrent();
             break;
         }
     }
@@ -310,8 +321,10 @@ void LCD_UpdateDfuState(bool dfuInProgress)
 
 void LCD_Loop(void)
 {
-    bool switchScreen = (millis() >= (LCD_CurrentScreenTimestamp + LCD_SCREEN_SWITCH_INTV_MS));
+    bool switchScreen = (Timestamp_GetTimeElapsed(LCD_CurrentScreenTimestamp, Timestamp_GetCurrent()) >=
+                         LCD_SCREEN_SWITCH_INTV_MS);
     CheckSensorValuesExpiration();
+    CheckTimeDisplayNeedUpdate();
 
     if (switchScreen)
         ScreenIterate();
@@ -343,7 +356,7 @@ static void DisplayLine(size_t line, const char *text)
 {
     if (strlen(text) > LCD_COLUMNS_NUMBER)
     {
-        INFO("Trying to write too long string on LCD: %s", text);
+        LOG_INFO("Trying to write too long string on LCD: %s", text);
         return;
     }
 
@@ -442,7 +455,7 @@ static void DisplayScreen(uint8_t screenNum)
             if (LCD_EnergySensor.value_state != SENSOR_VALUE_UNKNOWN ||
                 LCD_PreciseEnergySensor.value_state != SENSOR_VALUE_UNKNOWN)
             {
-                if (LCD_PreciseEnergySensor.value_timestamp > LCD_EnergySensor.value_timestamp)
+                if (Timestamp_Compare(LCD_EnergySensor.value_timestamp, LCD_PreciseEnergySensor.value_timestamp))
                 {
                     if (LCD_PreciseEnergySensor.value_state == SENSOR_VALUE_EXPIRED)
                         strcpy(text + strlen(text), "(");
@@ -521,6 +534,47 @@ static void DisplayScreen(uint8_t screenNum)
 
             break;
         }
+
+        case SCREEN_TYPE_DATE_AND_TIME:
+        {
+            Lcd.clear();
+
+            MeshTimeLastSync_T *last_time_sync = MeshTime_GetLastSyncTime();
+
+            DisplayLine(0, "Date:");
+            DisplayLine(2, "Time:");
+
+            if (last_time_sync->tai_seconds == TIME_TAI_SECONDS_TIME_UNKNOWN)
+            {
+                DisplayLine(1, "Unknown");
+                DisplayLine(3, "Unknown");
+            }
+            else
+            {
+                uint64_t actual_tai_ms = last_time_sync->tai_seconds * 1000 +
+                                         TIME_SUBSECONDS_TO_MS(last_time_sync->subsecond) +
+                                         Timestamp_GetTimeElapsed(last_time_sync->local_sync_timestamp_ms,
+                                                                  Timestamp_GetCurrent());
+
+                int16_t time_zone_offset_minutes = TIME_ZONE_OFFSET_STATE_TO_MIN(
+                    (int16_t)last_time_sync->time_zone_offset);
+                int16_t          leap_seconds = TIME_TAI_UTC_DELTA_STATE_TO_SEC((int16_t)last_time_sync->tai_utc_delta);
+                struct LocalTime local_time   = TAILocalTimeConverter_TAIToLocalTime(actual_tai_ms / 1000,
+                                                                                   time_zone_offset_minutes,
+                                                                                   leap_seconds);
+
+                char date_str[16];
+                char time_str[16];
+
+                sprintf(date_str, "%04u-%02u-%02u", local_time.year, local_time.month + 1, local_time.day);
+                sprintf(time_str, "%02u:%02u:%02u", local_time.hour, local_time.minutes, local_time.seconds);
+
+                DisplayLine(1, date_str);
+                DisplayLine(3, time_str);
+            }
+
+            break;
+        }
     }
 
     LCD_NeedsUpdate = false;
@@ -547,50 +601,66 @@ static void ScreenIterate(void)
     if (LCD_CurrentScreen > SCREEN_TYPE_LAST)
         LCD_CurrentScreen = SCREEN_TYPE_FIRST;
 
-    LCD_CurrentScreenTimestamp = millis();
+    LCD_CurrentScreenTimestamp = Timestamp_GetCurrent();
 }
 
 static void CheckSensorValuesExpiration(void)
 {
-    if (millis() > LCD_PirSensor.value_timestamp + LCD_PirSensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_PirSensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_PirSensor.value_expiration_time) &&
         LCD_PirSensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_PirSensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate           = true;
     }
 
-    if (millis() > LCD_AlsSensor.value_timestamp + LCD_AlsSensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_AlsSensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_AlsSensor.value_expiration_time) &&
         LCD_AlsSensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_AlsSensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate           = true;
     }
 
-    if (millis() > LCD_PowerSensor.value_timestamp + LCD_PowerSensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_PowerSensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_PowerSensor.value_expiration_time) &&
         LCD_PowerSensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_PowerSensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate             = true;
     }
 
-    if (millis() > LCD_CurrentSensor.value_timestamp + LCD_CurrentSensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_CurrentSensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_CurrentSensor.value_expiration_time) &&
         LCD_CurrentSensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_CurrentSensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate               = true;
     }
 
-    if (millis() > LCD_VoltageSensor.value_timestamp + LCD_VoltageSensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_VoltageSensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_VoltageSensor.value_expiration_time) &&
         LCD_VoltageSensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_VoltageSensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate               = true;
     }
 
-    if (millis() > LCD_EnergySensor.value_timestamp + LCD_EnergySensor.value_expiration_time &&
+    if ((Timestamp_GetTimeElapsed(LCD_EnergySensor.value_timestamp, Timestamp_GetCurrent()) >
+         LCD_EnergySensor.value_expiration_time) &&
         LCD_EnergySensor.value_state == SENSOR_VALUE_ACTUAL)
     {
         LCD_EnergySensor.value_state = SENSOR_VALUE_EXPIRED;
         LCD_NeedsUpdate              = true;
+    }
+}
+
+static void CheckTimeDisplayNeedUpdate(void)
+{
+    static uint32_t time_update_timestamp = 0;
+    if (Timestamp_GetTimeElapsed(time_update_timestamp, Timestamp_GetCurrent()) > LCD_DATE_AND_TIME_UPDATE_PERIOD_MS)
+    {
+        time_update_timestamp += LCD_DATE_AND_TIME_UPDATE_PERIOD_MS;
+        LCD_NeedsUpdate = true;
     }
 }

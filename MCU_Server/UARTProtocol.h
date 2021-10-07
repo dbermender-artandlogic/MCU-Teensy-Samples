@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "Config.h"
+#include "RTC.h"
 #include "stdint.h"
 
 
@@ -59,11 +60,6 @@ void UART_SendPingRequest(void);
 void UART_SendPongResponse(uint8_t *p_payload, uint8_t len);
 
 /*
- *  Send Software Reset Request command
- */
-void UART_SendSoftwareResetRequest(void);
-
-/*
  *  Send Create Instances Request command
  *
  *  @param * model_id   Pointer to model ids list
@@ -80,6 +76,14 @@ void UART_SendCreateInstancesRequest(uint8_t *model_id, uint8_t len);
 void UART_SendMeshMessageRequest(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Send Mesh Message Request1 command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendMeshMessageRequest1(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Send Sensor Update Request command
  *
  *  @param * p_payload   Command payload
@@ -88,9 +92,27 @@ void UART_SendMeshMessageRequest(uint8_t *p_payload, uint8_t len);
 void UART_SendSensorUpdateRequest(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Send Software Reset Request command
+ */
+void UART_SendSoftwareResetRequest(void);
+
+/*
+ *  Send Firmware Version Set Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendFirmwareVersionSetRequest(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Send Start Node Request command
  */
 void UART_StartNodeRequest(void);
+
+/*
+ *  Send Firmware Version Request command
+ */
+void UART_ModemFirmwareVersionRequest(void);
 
 /*
  *  Send Set Fault Request command
@@ -181,6 +203,36 @@ void UART_SendDfuCancelRequest(uint8_t *p_payload, uint8_t len);
 void UART_SendFirmwareVersionSetRequest(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Send Time Source Get Response command
+ *
+ *  @param TimeDate*    Time contained in TimeSourceGetResponse
+ *  @param instance_idx instance index
+*/
+void UART_SendTimeSourceGetResponse(uint8_t instance_idx, TimeDate *time);
+
+/*
+ *  Send Time Source Set Response command
+ *
+ *  @param instance_idx instance index
+ */
+void UART_SendTimeSourceSetResponse(uint8_t instance_idx);
+
+/*
+ *  Send Time Get Request command
+ *
+ *  @param instance_idx instance index
+ */
+void UART_SendTimeGetRequest(uint8_t instance_idx);
+
+/*
+ *  Send Time BatteryStatusSetRequest command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendBatteryStatusSetRequest(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Receive and process incoming UART command
  */
 void UART_ProcessIncomingCommand(void);
@@ -191,7 +243,6 @@ void UART_ProcessIncomingCommand(void);
  *  @param * p_payload   Command payload
  *  @param len           Payload len
  */
-
 extern void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len);
 
 /*
@@ -209,6 +260,7 @@ extern void ProcessEnterDevice(uint8_t *p_payload, uint8_t len);
  *  @param len           Payload len
  */
 extern void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len);
+
 /*
  *  Process Start Node Response command
  *
@@ -226,6 +278,14 @@ extern void ProcessEnterNode(uint8_t *p_payload, uint8_t len);
 extern void ProcessMeshCommand(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Process Mesh Message Request1 command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+extern void ProcessMeshMessageRequest1(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Process Attention Event command
  *
  *  @param * p_payload   Command payload
@@ -240,6 +300,14 @@ extern void ProcessAttention(uint8_t *p_payload, uint8_t len);
  *  @param len           Payload len
  */
 extern void ProcessError(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Process Modem Firmware Version Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+extern void ProcessModemFirmwareVersion(uint8_t *p_payload, uint8_t len);
 
 /*
  *  Process Start Test command
@@ -309,5 +377,10 @@ extern void ProcessDfuCancelResponse(uint8_t *p_payload, uint8_t len);
  *  Process Firmware Version set response
  */
 extern void ProcessFirmwareVersionSetResponse(void);
+
+/*
+ *  Process FactoryResetEvent
+ */
+extern void ProcessFactoryResetEvent(void);
 
 #endif    // UART_H_

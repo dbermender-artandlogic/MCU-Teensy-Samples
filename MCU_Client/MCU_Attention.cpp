@@ -23,8 +23,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "MCU_Attention.h"
 
 #include "Arduino.h"
-#include "Config.h"
+#include "Log.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
+
+
+#define ATTENTION_TIME_MS 500 /**< Defines attention state change time in milliseconds. */
 
 
 static bool     AttentionState;
@@ -43,13 +47,10 @@ void LoopAttention(void)
     if (!AttentionState)
         return;
 
-    uint32_t timestamp = millis();
-    uint32_t duration  = timestamp - AttentionToggleTimestamp;
-
-    if (duration >= ATTENTION_TIME_MS)
+    if (Timestamp_GetTimeElapsed(AttentionToggleTimestamp, Timestamp_GetCurrent()) >= ATTENTION_TIME_MS)
     {
         AttentionLedValue        = !AttentionLedValue;
-        AttentionToggleTimestamp = millis();
+        AttentionToggleTimestamp = Timestamp_GetCurrent();
 
         digitalWrite(PIN_LED_STATUS, AttentionLedValue);
     }
@@ -57,7 +58,7 @@ void LoopAttention(void)
 
 void AttentionStateSet(bool state)
 {
-    AttentionToggleTimestamp = millis();
+    AttentionToggleTimestamp = Timestamp_GetCurrent();
     AttentionState           = state;
     AttentionLedValue        = false;
     digitalWrite(PIN_LED_STATUS, AttentionLedValue);
@@ -65,6 +66,6 @@ void AttentionStateSet(bool state)
 
 void ProcessAttention(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Attention State %d\n\n.", p_payload[0]);
+    LOG_INFO("Attention State %d", p_payload[0]);
     AttentionStateSet(p_payload[0] == 0x01);
 }

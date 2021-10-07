@@ -26,8 +26,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdint.h>
 
 #include "Arduino.h"
-#include "Config.h"
+#include "Log.h"
 #include "Mesh.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
 
 
@@ -46,6 +47,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define EXAMPLE_FAULT_ID 0x01u
 
+#define BUTTON_DEBOUNCE_TIME_MS 20 /**< Defines buttons debounce time in milliseconds. */
+#define TEST_TIME_MS 1500          /**< Defines fake test duration in milliseconds. */
+
 
 static volatile bool Fault      = false; /**< Implies if Fault button has been pushed */
 static volatile bool Connection = false; /**< Implies if Connection button has been pushed */
@@ -56,24 +60,6 @@ static bool     TestStarted        = false;                  /**  True, if test 
 static uint32_t TestStartTimestamp = 0;                      /**  Time left to finish test.*/
 static uint8_t  TestStartPayload[TEST_MSG_LEN];              /**  Current test payload.*/
 
-
-/*
- *  Send Health Set Fault Request
- *
- *  @param company_id      Company id
- *  @param fault_id        Fault id
- *  @param instance_idx    Instance index
- */
-static void MCU_Health_SendSetFaultRequest(uint16_t company_id, uint8_t fault_id, uint8_t instance_idx);
-
-/*
- *  Send Health Clear Fault Request
- *
- *  @param company_id      Company id
- *  @param fault_id        Fault id
- *  @param instance_idx    Instance index
- */
-static void MCU_Health_SendClearFaultRequest(uint16_t company_id, uint8_t fault_id, uint8_t instance_idx);
 
 /*
  * Fault button interrupt handler
@@ -137,7 +123,7 @@ void ProcessStartTest(uint8_t *p_payload, uint8_t len)
     digitalWrite(PIN_LED_STATUS, true);
     memcpy(TestStartPayload, p_payload, len);
     TestStarted        = true;
-    TestStartTimestamp = millis();
+    TestStartTimestamp = Timestamp_GetCurrent();
 }
 
 bool IsTestInProgress(void)
@@ -147,14 +133,9 @@ bool IsTestInProgress(void)
 
 void SetupHealth(void)
 {
-    INFO("Health initialization.\n");
-    pinMode(PIN_LED_1, OUTPUT);
-    pinMode(PIN_LED_2, OUTPUT);
+    LOG_INFO("Health initialization");
     pinMode(PB_FAULT, INPUT_PULLUP);
     pinMode(PB_CONNECTION, INPUT_PULLUP);
-
-    digitalWrite(PIN_LED_1, FaultState);
-    digitalWrite(PIN_LED_2, ConnectionState);
 
     attachInterrupt(digitalPinToInterrupt(PB_FAULT), InterruptFaultPBClick, FALLING);
     attachInterrupt(digitalPinToInterrupt(PB_CONNECTION), InterruptConnectionPBClick, FALLING);
@@ -165,9 +146,8 @@ void LoopHealth(void)
     if (Fault)
     {
         Fault = false;
-        INFO("Fault button\n");
+        LOG_INFO("Fault button");
         FaultState = !FaultState;
-        digitalWrite(PIN_LED_1, FaultState);
 
         if (FaultState)
         {
@@ -182,9 +162,8 @@ void LoopHealth(void)
     if (Connection)
     {
         Connection = false;
-        INFO("Connection button\n");
+        LOG_INFO("Connection button");
         ConnectionState = !ConnectionState;
-        digitalWrite(PIN_LED_2, ConnectionState);
 
         if (ConnectionState)
         {
@@ -198,9 +177,7 @@ void LoopHealth(void)
 
     if (IsTestInProgress())
     {
-        uint32_t timestamp = millis();
-        uint32_t duration  = timestamp - TestStartTimestamp;
-        if (duration >= TEST_TIME_MS)
+        if (Timestamp_GetTimeElapsed(TestStartTimestamp, Timestamp_GetCurrent()) >= TEST_TIME_MS)
         {
             TestStarted = false;
             digitalWrite(PIN_LED_STATUS, false);

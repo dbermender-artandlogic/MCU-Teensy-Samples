@@ -23,8 +23,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "SDM.h"
 
 #include "Arduino.h"
-#include "Config.h"
+#include "Log.h"
 #include "MODBUS.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
 
 
@@ -160,7 +161,7 @@ void LoopSDM(void)
 
     if (waiting_for_query != SDM_NO_QUERY)
     {
-        if (last_query_timestamp + SDM_QUERY_TIMEOUT <= millis())
+        if (Timestamp_GetTimeElapsed(last_query_timestamp, Timestamp_GetCurrent()) >= SDM_QUERY_TIMEOUT)
         {
             timeouts_in_row++;
 
@@ -183,18 +184,22 @@ void LoopSDM(void)
 
                 SDM_SendRequestInput(query_address);
                 waiting_for_query    = query_address;
-                last_query_timestamp = millis();
+                last_query_timestamp = Timestamp_GetCurrent();
 
                 query_index++;
                 break;
             }
+#if holding_query_entries == 0
+            case input_query_entries:
+#else
             case input_query_entries ... input_query_entries + (holding_query_entries - 1):
+#endif
             {
                 uint16_t query_address = holding_query_table[query_index - input_query_entries];
 
                 SDM_SendRequestHolding(query_address);
                 waiting_for_query    = query_address;
-                last_query_timestamp = millis();
+                last_query_timestamp = Timestamp_GetCurrent();
 
                 query_index++;
                 break;
@@ -213,7 +218,7 @@ void LoopSDM(void)
 void SetupSDM(void)
 {
     MODBUS_INTERFACE.begin(MODBUS_INTERFACE_BAUDRATE);
-    MODBUS_INTERFACE.transmitterEnable(2);
+    MODBUS_INTERFACE.transmitterEnable(PIN_MODBUS_RTS);
     // Waits for debug interface initialization.
     delay(1000);
     is_enabled = true;
@@ -274,7 +279,7 @@ void SDM_SetMeasurementMode(uint16_t measurement_mode)
 
 void MODBUS_ProcessReadInputRegisters(uint8_t slave_address, size_t data_len, uint16_t *p_data)
 {
-    DEBUG("Processing query: %04X, len %d\n", waiting_for_query, data_len);
+    LOG_DEBUG("Processing query: %04X, len %d", waiting_for_query, data_len);
 
     switch (waiting_for_query)
     {
@@ -372,7 +377,7 @@ void MODBUS_ProcessReadInputRegisters(uint8_t slave_address, size_t data_len, ui
 
 void MODBUS_ProcessReadHoldingRegisters(uint8_t slave_address, size_t data_len, uint16_t *p_data)
 {
-    DEBUG("Processing query: %04X, len %d\n", waiting_for_query, data_len);
+    LOG_DEBUG("Processing query: %04X, len %d", waiting_for_query, data_len);
 
     switch (waiting_for_query)
     {
@@ -436,7 +441,7 @@ void MODBUS_ProcessReadPresetMultipleRegisters(uint8_t  slave_address,
 void MODBUS_ProcessException(uint8_t slave_address, uint8_t original_function_code, uint8_t error_code)
 {
     /// Not implemented
-    DEBUG("Received MODBUS exception\n");
+    LOG_DEBUG("Received MODBUS exception");
 
     waiting_for_query = SDM_NO_QUERY;
 }
@@ -472,7 +477,7 @@ static void SDM_ProcessFloatData(size_t data_len, uint16_t *p_data, float *p_des
 {
     if (data_len < (sizeof(*p_dest) / sizeof(uint16_t)))
     {
-        DEBUG("Cannot update float, data_len: %d\n", data_len);
+        LOG_DEBUG("Cannot update float, data_len: %d", data_len);
         MODBUS_ClearBuffer();
         return;
     }
@@ -481,7 +486,7 @@ static void SDM_ProcessFloatData(size_t data_len, uint16_t *p_data, float *p_des
     p_dest_uint16[1]        = p_data[0];
     p_dest_uint16[0]        = p_data[1];
 
-    DEBUG("Updated %p to %f\n", p_dest, *p_dest);
+    LOG_DEBUG("Updated %p to %f", p_dest, *p_dest);
 }
 
 static void SDM_ProcessUint16Data(size_t data_len, uint16_t *p_data, uint16_t *p_dest)

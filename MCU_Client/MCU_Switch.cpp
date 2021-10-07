@@ -26,12 +26,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdint.h>
 
 #include "Arduino.h"
-#include "Config.h"
 #include "Encoder.h"
 #include "LCD.h"
+#include "Log.h"
 #include "Mesh.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
-
+#include "Utils.h"
 
 /**
  * Buttons placement definitions
@@ -81,9 +82,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define GENERIC_LEVEL_TRANSITION_TIME_MS 100 /**< Defines default transition time */
 #define GENERIC_LEVEL_DELAY_TIME_MS 0        /**< Defines default delay time */
 
-#define POT_DEADBAND 20 /**< Potentiometer deadband. About 2% of full range */
-#define ANALOG_MIN 0    /**< Defines lower range of analog measurements. */
-#define ANALOG_MAX 1023 /**< Defines uppper range of analog measurements. */
+#define POT_DEADBAND 20            /**< Potentiometer deadband. About 2% of full range */
+#define ANALOG_MIN 0               /**< Defines lower range of analog measurements. */
+#define ANALOG_MAX 1023            /**< Defines uppper range of analog measurements. */
+#define BUTTON_DEBOUNCE_TIME_MS 20 /**< Defines buttons debounce time in milliseconds. */
 
 
 static volatile bool On1                       = false; /**< Implies if Generic ON button has been pushed */
@@ -232,9 +234,8 @@ static int16_t GenericLevelGet(void)
 static void PrintGenericLevelTemperature(int gen_level)
 {
     unsigned percentage = ((gen_level - GENERIC_LEVEL_MIN) * 100.0) / (GENERIC_LEVEL_MAX - GENERIC_LEVEL_MIN);
-    INFO("Current Generic Level of Temperature is %d (%d%)\n", gen_level, percentage);
+    LOG_INFO("Current Generic Level of Temperature is %d (%d%)", gen_level, percentage);
 }
-
 
 void SetInstanceIdxCtl(uint8_t idx)
 {
@@ -258,7 +259,7 @@ uint8_t GetInstanceIdxLc(void)
 
 void SetupSwitch(void)
 {
-    INFO("Switch initialization.\n");
+    LOG_INFO("Switch initialization");
     pinMode(PB_ON_1, INPUT_PULLUP);
     pinMode(PB_OFF_1, INPUT_PULLUP);
     pinMode(PB_ON_2, INPUT_PULLUP);
@@ -277,7 +278,7 @@ void LoopSwitch(void)
     if (On1)
     {
         On1 = false;
-        INFO("Generic ON 1\n");
+        LOG_INFO("Generic ON 1");
         Mesh_SendGenericOnOffSet(LightLcClientInstanceIdx,
                                  GENERIC_ON,
                                  ON_OFF_TRANSITION_TIME_MS,
@@ -289,7 +290,7 @@ void LoopSwitch(void)
     if (Off1)
     {
         Off1 = false;
-        INFO("Generic OFF 1\n");
+        LOG_INFO("Generic OFF 1");
         Mesh_SendGenericOnOffSet(LightLcClientInstanceIdx,
                                  GENERIC_OFF,
                                  ON_OFF_TRANSITION_TIME_MS,
@@ -301,7 +302,7 @@ void LoopSwitch(void)
     if (On2)
     {
         On2 = false;
-        INFO("Generic ON 2\n");
+        LOG_INFO("Generic ON 2");
         Mesh_SendGenericOnOffSet(LightCtlClientInstanceIdx,
                                  GENERIC_ON,
                                  ON_OFF_TRANSITION_TIME_MS,
@@ -313,7 +314,7 @@ void LoopSwitch(void)
     if (Off2)
     {
         Off2 = false;
-        INFO("Generic OFF 2\n");
+        LOG_INFO("Generic OFF 2");
         Mesh_SendGenericOnOffSet(LightCtlClientInstanceIdx,
                                  GENERIC_OFF,
                                  ON_OFF_TRANSITION_TIME_MS,
@@ -325,26 +326,29 @@ void LoopSwitch(void)
     if (Reinit)
     {
         Reinit = false;
-        INFO("LCD Reinit\n");
+        LOG_INFO("LCD Reinit");
 
         LCD_Reinit();
     }
 
-    static int long last_message_time = ULONG_MAX;
+    static int long last_message_time = UINT32_MAX;
 
     long encoder_pos;
     encoder_pos = DeltaEncoder.read();
 
     if (encoder_pos != 0)
     {
-        if (last_message_time + DELTA_INTVL_MS <= millis())
+        if (Timestamp_GetTimeElapsed(last_message_time, Timestamp_GetCurrent()) >= DELTA_INTVL_MS)
         {
             static uint32_t last_delta_message_time = UINT32_MAX;
             static int      delta                   = 0;
 
-            bool is_new_tid = (last_delta_message_time + DELTA_NEW_TID_INTVL) < millis();
+            bool is_new_tid = (Timestamp_GetTimeElapsed(last_delta_message_time, Timestamp_GetCurrent()) >
+                               DELTA_NEW_TID_INTVL);
             if (is_new_tid)
+            {
                 delta = 0;
+            }
 
             delta += encoder_pos;
             Mesh_SendGenericDeltaSet(LightLcClientInstanceIdx,
@@ -355,22 +359,22 @@ void LoopSwitch(void)
                                      is_new_tid);
 
             if (is_new_tid)
-                INFO("Delta Continue %d \n\n", delta);
+                LOG_INFO("Delta Continue %d", delta);
             else
-                INFO("Delta Start %d \n\n", delta);
+                LOG_INFO("Delta Start %d", delta);
 
             DeltaEncoder.write(0);
-            last_delta_message_time = millis();
-            last_message_time       = millis();
+            last_delta_message_time = Timestamp_GetCurrent();
+            last_message_time       = Timestamp_GetCurrent();
         }
     }
 
-    if (last_message_time + GENERIC_LEVEL_INTVL_MS <= millis())
+    if (Timestamp_GetTimeElapsed(last_message_time, Timestamp_GetCurrent()) >= GENERIC_LEVEL_INTVL_MS)
     {
         int16_t gen_level = GenericLevelGet();
         if (HasGenLevelChanged(gen_level))
         {
-            INFO("Temperature changed");
+            LOG_INFO("Temperature changed");
             PrintGenericLevelTemperature(gen_level);
             Mesh_SendGenericLevelSet(LightCtlClientInstanceIdx,
                                      gen_level,
@@ -379,7 +383,7 @@ void LoopSwitch(void)
                                      GENERIC_LEVEL_NUMBER_OF_REPEATS,
                                      true);
 
-            last_message_time = millis();
+            last_message_time = Timestamp_GetCurrent();
         }
     }
 }

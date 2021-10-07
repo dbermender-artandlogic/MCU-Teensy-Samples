@@ -26,12 +26,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <TimerThree.h>
 #include <math.h>
 
-#include "Config.h"
+#include "Log.h"
 #include "Mesh.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
 
 
 #define PWM_OUTPUT_MAX UINT16_MAX
+#define PWM_RESOLUTION 16 /**< Defines PWM resolution value */
 
 #if ENABLE_1_10_V
 #define PWM_OUTPUT_MIN (uint16_t)(0.12 * PWM_OUTPUT_MAX)
@@ -158,8 +160,7 @@ static void DimmInterrupt(void)
 
 static uint16_t GetPresentValue(Transition *p_transition)
 {
-    uint32_t time       = millis();
-    uint32_t delta_time = time - p_transition->start_timestamp;
+    uint32_t delta_time = Timestamp_GetTimeElapsed(p_transition->start_timestamp, Timestamp_GetCurrent());
 
     if (delta_time > p_transition->transition_time)
     {
@@ -220,7 +221,7 @@ static void UpdateTransition(uint16_t present, uint16_t target, uint32_t transit
     p_transition->start_value     = present;
     p_transition->target_value    = target;
     p_transition->transition_time = transition_time;
-    p_transition->start_timestamp = millis();
+    p_transition->start_timestamp = Timestamp_GetCurrent();
     interrupts();
 }
 
@@ -256,14 +257,14 @@ static void PerformStartupSequenceIfNeeded(void)
                                              DEVICE_STARTUP_SEQ_STAGE_OFF_LIGHTNESS};
     if (UnprovisionedSequenceEnableFlag)
     {
-        sequence_start                  = millis();
+        sequence_start                  = Timestamp_GetCurrent();
         UnprovisionedSequenceEnableFlag = false;
         present_startup_sequence_stage  = DEVICE_SEQUENCE_STAGE_1;
 
         ProcessTargetLightness(0, startup_sequence_lightness[present_startup_sequence_stage], 0);
     }
 
-    unsigned long           sequence_duration = millis() - sequence_start;
+    unsigned long           sequence_duration = Timestamp_GetTimeElapsed(sequence_start, Timestamp_GetCurrent());
     DeviceStartupSequence_T calculated_stage  = GetStartupSequenceStage(sequence_duration);
 
     if (present_startup_sequence_stage != DEVICE_SEQUENCE_STAGE_OFF &&
@@ -312,7 +313,7 @@ void ProcessTargetLightness(uint16_t present, uint16_t target, uint32_t transiti
     if (!IsEnabled)
         return;
 
-    INFO("Lightness: %d -> %d, transition_time %d\n", present, target, transition_time);
+    LOG_INFO("Lightness: %d -> %d, transition_time %d", present, target, transition_time);
 
     UpdateTransition(present, target, transition_time, &Light);
 }
@@ -322,7 +323,7 @@ void ProcessTargetLightnessTemp(uint16_t present, uint16_t target, uint32_t tran
     if (!IsEnabled)
         return;
 
-    INFO("Temperature: %d-> %d, transition_time %d\n", present, target, transition_time);
+    LOG_INFO("Temperature: %d-> %d, transition_time %d", present, target, transition_time);
 
     UpdateTransition(present, target, transition_time, &Temperature);
 }

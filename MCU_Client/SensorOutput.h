@@ -19,8 +19,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef MCU_SENSOR_H
-#define MCU_SENSOR_H
+#ifndef SENSOR_OUTPUT_H
+#define SENSOR_OUTPUT_H
 
 
 #include <stdint.h>
@@ -59,18 +59,18 @@ typedef enum
 
 
 /*
- *  Set Sensor Client instance index
+ *  Set Sensor Output instance index
  *
  *  @param idx  Lightness value
  */
-void SetInstanceIdxSensor(uint8_t idx);
+void SensorOutput_SetInstanceIdx(uint8_t idx);
 
 /*
- *  Get Sensor Client instance index
+ *  Get Sensor Output instance index
  *
  *  @return     Lightness value
  */
-uint8_t GetInstanceIdxSensor(void);
+uint8_t SensorOutput_GetInstanceIdx(void);
 
 /*
  *  Process ALS value update
@@ -78,7 +78,7 @@ uint8_t GetInstanceIdxSensor(void);
  *  @param src_addr            Source address
  *  @param sensor_value        New sensor value
  */
-void ProcessPresentAmbientLightLevel(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPresentAmbientLightLevel(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process PIR value update
@@ -86,7 +86,7 @@ void ProcessPresentAmbientLightLevel(uint16_t src_addr, SensorValue_T sensor_val
  *  @param src_addr            Source address
  *  @param sensor_value        New sensor value
  */
-void ProcessPresenceDetected(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPresenceDetected(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process Power value update
@@ -94,7 +94,7 @@ void ProcessPresenceDetected(uint16_t src_addr, SensorValue_T sensor_value);
  *  @param sensor_value       New Power value
  *  @param src_addr           Source address
  */
-void ProcessPresentDeviceInputPower(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPresentDeviceInputPower(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process Current value update
@@ -102,7 +102,7 @@ void ProcessPresentDeviceInputPower(uint16_t src_addr, SensorValue_T sensor_valu
  *  @param sensor_value       New Current value
  *  @param src_addr           Source address
  */
-void ProcessPresentInputCurrent(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPresentInputCurrent(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process Voltage value update
@@ -110,7 +110,7 @@ void ProcessPresentInputCurrent(uint16_t src_addr, SensorValue_T sensor_value);
  *  @param sensor_value       New Voltage value
  *  @param src_addr           Source address
  */
-void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process Energy value update
@@ -118,7 +118,7 @@ void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value);
  *  @param sensor_value       New Energy value
  *  @param src_addr           Source address
  */
-void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Process Precise Energy value update
@@ -126,11 +126,11 @@ void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
  *  @param sensor_value       New Energy value
  *  @param src_addr           Source address
  */
-void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+void SensorOutput_ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
 
 /*
  *  Setup sensor server hardware
  */
-void SetupSensor(void);
+void SensorOutput_Setup(void);
 
-#endif    // MCU_SENSOR_H
+#endif    // SENSOR_OUTPUT_H

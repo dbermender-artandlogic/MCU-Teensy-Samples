@@ -23,9 +23,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Mesh.h"
 
 #include "Arduino.h"
-#include "Config.h"
+#include "Log.h"
+#include "Timestamp.h"
 #include "UARTProtocol.h"
-
+#include "Utils.h"
 
 /**
  * Supported Mesh Opcodes definitions
@@ -49,16 +50,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MESH_MESSAGE_LIGHT_LC_MODE_SET_UNACKNOWLEDGED 0x8293
 #define MESH_MESSAGE_LIGHT_LC_MODE_STATUS 0x8294
 #define MESH_MESSAGE_SENSOR_STATUS 0x0052
-
-/**
- * Default communication properties
- */
-#define MESH_REPEATS_INTERVAL_MS 20
-#define MESH_MESSAGES_QUEUE_LENGTH 10
+#define MESH_MESSAGE_LEVEL_STATUS 0x8208
+#define MESH_MESSAGE_LIGHT_CTL_TEMPERATURE_STATUS 0x8266
+#define MESH_MESSAGE_LEVEL_GET 0x8205
+#define MESH_MESSAGE_LIGHT_EL_TEST 0xFF3601
 
 /**
  * Used Mesh Messages len
  */
+#define MESH_MESSAGE_LIGHT_L_GET_LEN 4
 #define MESH_MESSAGE_GENERIC_ONOFF_SET_LEN 8
 #define MESH_MESSAGE_LIGHT_L_SET_LEN 9
 #define MESH_MESSAGE_GENERIC_DELTA_SET_LEN 11
@@ -92,6 +92,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SS_LONG_LEN_MASK 0xFE
 #define SS_LONG_LEN_OFFSET 1
 
+/**
+ * Default communication properties
+ */
+#define MESH_REPEATS_INTERVAL_MS 20
+#define MESH_MESSAGES_QUEUE_LENGTH 10
+
+/**
+ * Opcode size mask
+ */
+#define MESH_OPCODE_SIZE_3_OCTET_MASK 0xC0
+#define MESH_OPCODE_SIZE_2_OCTET_MASK 0x80
+#define MESH_OPCODE_SIZE_RFU_MASK 0x7F
+#define MESH_OPCODE_SIZE_1_OCTET_MASK 0x00
 
 typedef enum
 {
@@ -135,14 +148,47 @@ typedef struct
 
 typedef struct
 {
-    MsgType_T     msg_type;
-    uint8_t       instance_idx;
-    void *        mesh_msg;
-    unsigned long dispatch_time;
+    MsgType_T msg_type;
+    uint8_t   instance_idx;
+    void *    mesh_msg;
+    uint32_t  dispatch_time;
 } EnqueuedMsg_T;
 
 EnqueuedMsg_T *MeshMsgsQueue[MESH_MESSAGES_QUEUE_LENGTH];
 
+
+/*
+ *  Convert time from mesh format to miliseconds
+ *
+ *  @param time_mesh_format   Time in mesh format
+ *  @param * p_time_ms        Pointer to result
+ *  @return                   True if success, false otherwise
+ */
+static bool MeshInternal_ConvertFromMeshFormatToMsTransitionTime(uint8_t time_mesh_format, uint32_t *p_time_ms);
+
+/*
+ *  Process Light Lightness Status mesh message
+ *
+ *  @param * p_payload   Pointer mesh message payload
+ *  @param len           Payload length
+ */
+static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len);
+
+/*
+ *  Process Generic Level Status mesh message
+ *
+ *  @param * p_payload   Pointer mesh message payload
+ *  @param len           Payload length
+ */
+static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len);
+
+/*
+ *  Process Light CTL Status mesh message
+ *
+ *  @param * p_payload   Pointer mesh message payload
+ *  @param len           Payload length
+ */
+static void MeshInternal_ProcessLightCTLTempStatus(uint8_t *p_payload, size_t len);
 
 /*
  *  Send Generic OnOff Set message
@@ -301,7 +347,8 @@ void Mesh_ProcessMeshCommand(uint8_t *p_payload, size_t len)
     uint16_t mesh_cmd          = ((uint16_t)p_payload[index++]);
     mesh_cmd |= ((uint16_t)p_payload[index++] << 8);
 
-    INFO("Process Mesh Command [%d %d 0x%02X]\n", instance_index, instance_subindex, mesh_cmd);
+    LOG_DEBUG("Process Mesh Command [%d %d 0x%02X]", instance_index, instance_subindex, mesh_cmd);
+
     switch (mesh_cmd)
     {
         case MESH_MESSAGE_SENSOR_STATUS:
@@ -309,7 +356,35 @@ void Mesh_ProcessMeshCommand(uint8_t *p_payload, size_t len)
             MeshInternal_ProcessSensorStatus(p_payload + index, len - index);
             break;
         }
+        case MESH_MESSAGE_LIGHT_L_STATUS:
+        {
+            MeshInternal_ProcessLightLStatus(p_payload + index, len - index);
+            break;
+        }
+        case MESH_MESSAGE_LEVEL_STATUS:
+        {
+            MeshInternal_ProcessLevelStatus(p_payload + index, len - index);
+            break;
+        }
+        case MESH_MESSAGE_LIGHT_CTL_TEMPERATURE_STATUS:
+        {
+            MeshInternal_ProcessLightCTLTempStatus(p_payload + index, len - index);
+            break;
+        }
     }
+}
+
+void Mesh_SendLightLGet(uint8_t instance_idx)
+{
+    uint8_t buf[MESH_MESSAGE_LIGHT_L_GET_LEN];
+    size_t  index = 0;
+
+    buf[index++] = instance_idx;
+    buf[index++] = 0x00;
+    buf[index++] = lowByte(MESH_MESSAGE_LIGHT_L_GET);
+    buf[index++] = highByte(MESH_MESSAGE_LIGHT_L_GET);
+
+    UART_SendMeshMessageRequest(buf, sizeof(buf));
 }
 
 void Mesh_Loop(void)
@@ -318,7 +393,7 @@ void Mesh_Loop(void)
     {
         if (MeshMsgsQueue[i] == NULL)
             continue;
-        if (MeshMsgsQueue[i]->dispatch_time > millis())
+        if (Timestamp_Compare(Timestamp_GetCurrent(), MeshMsgsQueue[i]->dispatch_time))
             continue;
 
         switch (MeshMsgsQueue[i]->msg_type)
@@ -363,11 +438,10 @@ void Mesh_Loop(void)
     }
 }
 
-
 void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
                               bool     value,
-                              unsigned transition_time,
-                              unsigned delay_ms,
+                              uint32_t transition_time,
+                              uint32_t delay_ms,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
@@ -387,7 +461,7 @@ void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
         EnqueuedMsg_T *p_enqueued_msg = (EnqueuedMsg_T *)calloc(1, sizeof(EnqueuedMsg_T));
         p_enqueued_msg->instance_idx  = instance_idx;
         p_enqueued_msg->mesh_msg      = p_msg;
-        p_enqueued_msg->dispatch_time = millis() + i * MESH_REPEATS_INTERVAL_MS;
+        p_enqueued_msg->dispatch_time = Timestamp_GetCurrent() + i * MESH_REPEATS_INTERVAL_MS;
         p_enqueued_msg->msg_type      = GENERIC_ON_OFF_SET_MSG;
 
         for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
@@ -403,8 +477,8 @@ void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
 
 void Mesh_SendLightLSet(uint8_t  instance_idx,
                         uint16_t value,
-                        unsigned transition_time,
-                        unsigned delay_ms,
+                        uint32_t transition_time,
+                        uint32_t delay_ms,
                         uint8_t  num_of_repeats,
                         bool     is_new_transaction)
 {
@@ -424,7 +498,7 @@ void Mesh_SendLightLSet(uint8_t  instance_idx,
         EnqueuedMsg_T *p_enqueued_msg = (EnqueuedMsg_T *)calloc(1, sizeof(EnqueuedMsg_T));
         p_enqueued_msg->instance_idx  = instance_idx;
         p_enqueued_msg->mesh_msg      = p_msg;
-        p_enqueued_msg->dispatch_time = millis() + i * MESH_REPEATS_INTERVAL_MS;
+        p_enqueued_msg->dispatch_time = Timestamp_GetCurrent() + i * MESH_REPEATS_INTERVAL_MS;
         p_enqueued_msg->msg_type      = LIGHT_L_SET_MSG;
 
         for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
@@ -440,8 +514,8 @@ void Mesh_SendLightLSet(uint8_t  instance_idx,
 
 void Mesh_SendGenericLevelSet(uint8_t  instance_idx,
                               uint16_t value,
-                              unsigned transition_time,
-                              unsigned delay_ms,
+                              uint32_t transition_time,
+                              uint32_t delay_ms,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
@@ -461,7 +535,7 @@ void Mesh_SendGenericLevelSet(uint8_t  instance_idx,
         EnqueuedMsg_T *p_enqueued_msg = (EnqueuedMsg_T *)calloc(1, sizeof(EnqueuedMsg_T));
         p_enqueued_msg->instance_idx  = instance_idx;
         p_enqueued_msg->mesh_msg      = p_msg;
-        p_enqueued_msg->dispatch_time = millis() + i * MESH_REPEATS_INTERVAL_MS;
+        p_enqueued_msg->dispatch_time = Timestamp_GetCurrent() + i * MESH_REPEATS_INTERVAL_MS;
         p_enqueued_msg->msg_type      = GENERIC_LEVEL_SET_MSG;
 
         for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
@@ -477,8 +551,8 @@ void Mesh_SendGenericLevelSet(uint8_t  instance_idx,
 
 void Mesh_SendGenericDeltaSet(uint8_t  instance_idx,
                               int32_t  value,
-                              unsigned transition_time,
-                              unsigned delay_ms,
+                              uint32_t transition_time,
+                              uint32_t delay_ms,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
@@ -498,7 +572,7 @@ void Mesh_SendGenericDeltaSet(uint8_t  instance_idx,
         EnqueuedMsg_T *p_enqueued_msg = (EnqueuedMsg_T *)calloc(1, sizeof(EnqueuedMsg_T));
         p_enqueued_msg->instance_idx  = instance_idx;
         p_enqueued_msg->mesh_msg      = p_msg;
-        p_enqueued_msg->dispatch_time = millis() + i * MESH_REPEATS_INTERVAL_MS;
+        p_enqueued_msg->dispatch_time = Timestamp_GetCurrent() + i * MESH_REPEATS_INTERVAL_MS;
         p_enqueued_msg->msg_type      = GENERIC_DELTA_SET_MSG;
 
         for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
@@ -512,6 +586,155 @@ void Mesh_SendGenericDeltaSet(uint8_t  instance_idx,
     }
 }
 
+
+static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len)
+{
+    size_t   index = 0;
+    uint16_t present_value;
+    uint16_t target_value;
+    uint32_t transition_time_ms;
+
+    present_value = ((uint16_t)p_payload[index++]);
+    present_value |= ((uint16_t)p_payload[index++] << 8);
+
+    if (index < len)
+    {
+        target_value = ((uint16_t)p_payload[index++]);
+        target_value |= ((uint16_t)p_payload[index++] << 8);
+
+        bool is_valid = MeshInternal_ConvertFromMeshFormatToMsTransitionTime(p_payload[index++], &transition_time_ms);
+        if (!is_valid)
+        {
+            LOG_INFO("Rejected Transition Time");
+            return;
+        }
+    }
+    else
+    {
+        target_value       = present_value;
+        transition_time_ms = 0;
+    }
+
+    ProcessTargetLightness(present_value, target_value, transition_time_ms);
+}
+
+static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len)
+{
+    size_t   index = 0;
+    int16_t  target_value;
+    int16_t  present_value;
+    uint32_t transition_time_ms;
+
+    present_value = ((uint16_t)p_payload[index++]);
+    present_value |= ((uint16_t)p_payload[index++] << 8);
+
+    if (index < len)
+    {
+        target_value = ((uint16_t)p_payload[index++]);
+        target_value |= ((uint16_t)p_payload[index++] << 8);
+
+        bool is_valid = MeshInternal_ConvertFromMeshFormatToMsTransitionTime(p_payload[index++], &transition_time_ms);
+        if (!is_valid)
+        {
+            LOG_INFO("Rejected Transition Time");
+            return;
+        }
+    }
+    else
+    {
+        target_value       = present_value;
+        transition_time_ms = 0;
+    }
+
+    uint16_t present_lightness = present_value - INT16_MIN;
+    uint16_t target_lightness  = target_value - INT16_MIN;
+
+    ProcessTargetLightness(present_lightness, target_lightness, transition_time_ms);
+}
+
+static void MeshInternal_ProcessLightCTLTempStatus(uint8_t *p_payload, size_t len)
+{
+    size_t   index = 0;
+    uint16_t present_temperature;
+    uint16_t present_delta_uv;
+    uint16_t target_temperature;
+    uint16_t target_delta_uv;
+    uint32_t transition_time_ms;
+
+    present_temperature = ((uint16_t)p_payload[index++]);
+    present_temperature |= ((uint16_t)p_payload[index++] << 8);
+
+    present_delta_uv = ((uint16_t)p_payload[index++]);
+    present_delta_uv |= ((uint16_t)p_payload[index++] << 8);
+
+    if (index < len)
+    {
+        target_temperature = ((uint16_t)p_payload[index++]);
+        target_temperature |= ((uint16_t)p_payload[index++] << 8);
+
+        target_delta_uv = ((uint16_t)p_payload[index++]);
+        target_delta_uv |= ((uint16_t)p_payload[index++] << 8);
+
+        bool is_valid = MeshInternal_ConvertFromMeshFormatToMsTransitionTime(p_payload[index++], &transition_time_ms);
+        if (!is_valid)
+        {
+            LOG_INFO("Rejected Transition Time");
+            return;
+        }
+    }
+    else
+    {
+        target_temperature = present_temperature;
+        target_delta_uv    = present_delta_uv;
+        transition_time_ms = 0;
+    }
+
+    ProcessTargetLightnessTemp(present_temperature, target_temperature, transition_time_ms);
+}
+
+static bool MeshInternal_ConvertFromMeshFormatToMsTransitionTime(uint8_t time_mesh_format, uint32_t *p_time_ms)
+{
+    uint32_t number_of_steps = (time_mesh_format & MESH_TRANSITION_TIME_NUMBER_OF_STEPS_MASK);
+    uint32_t step_resolution = (time_mesh_format & MESH_TRANSITION_TIME_STEP_RESOLUTION_MASK);
+
+    if (MESH_TRANSITION_TIME_NUMBER_OF_STEPS_UNKNOWN_VALUE == number_of_steps)
+    {
+        *p_time_ms = 0;
+        return false;
+    }
+    else
+    {
+        switch (step_resolution)
+        {
+            case MESH_TRANSITION_TIME_STEP_RESOLUTION_10_MIN:
+            {
+                *p_time_ms = (uint32_t)MESH_NUMBER_OF_MS_IN_10MIN * number_of_steps;
+                break;
+            }
+            case MESH_TRANSITION_TIME_STEP_RESOLUTION_10_S:
+            {
+                *p_time_ms = (uint32_t)MESH_NUMBER_OF_MS_IN_10S * number_of_steps;
+                break;
+            }
+            case MESH_TRANSITION_TIME_STEP_RESOLUTION_1_S:
+            {
+                *p_time_ms = (uint32_t)MESH_NUMBER_OF_MS_IN_1S * number_of_steps;
+                break;
+            }
+            case MESH_TRANSITION_TIME_STEP_RESOLUTION_100_MS:
+            {
+                *p_time_ms = (uint32_t)MESH_NUMBER_OF_MS_IN_100_MS * number_of_steps;
+                break;
+            }
+            default:
+            {
+                *p_time_ms = (uint32_t)MESH_NUMBER_OF_MS_IN_100_MS * number_of_steps;
+                break;
+            }
+        }
+    }
+    return true;
+}
 
 static void MeshInternal_SendGenericOnOffSet(uint8_t instance_idx, GenericOnOffSetMsg_T *message)
 {
@@ -616,7 +839,7 @@ static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
 {
     if (len < 2)
     {
-        INFO("Received empty Sensor Status message\n");
+        LOG_INFO("Received empty Sensor Status message");
         return;
     }
 
@@ -625,7 +848,7 @@ static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
 
     if (len <= 2)
     {
-        INFO("Received empty Sensor Status message from: %d\n", src_addr);
+        LOG_INFO("Received empty Sensor Status message from: %d", src_addr);
         return;
     }
 
@@ -633,7 +856,7 @@ static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
     size_t index = 0;
     while (index < len)
     {
-        INFO("ProcessSensorStatus index: %d\n", index);
+        LOG_INFO("ProcessSensorStatus index: %d", index);
         if (p_payload[index] & SS_FORMAT_MASK)
         {
             /* Length field in Sensor Status message is 0-based */
@@ -698,7 +921,7 @@ static void MeshInternal_ProcessSensorProperty(uint16_t property_id, uint8_t *p_
         }
         default:
         {
-            INFO("Invalid property id\n");
+            LOG_INFO("Invalid property id");
         }
     }
 }
@@ -707,93 +930,95 @@ static void MeshInternal_ProcessPresenceDetected(uint8_t *p_payload, size_t len,
 {
     if (len != 1)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
     SensorValue_T sensor_value = {.pir = p_payload[0]};
 
-    ProcessPresenceDetected(src_addr, sensor_value);
+    SensorOutput_ProcessPresenceDetected(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessPresentAmbientLightLevel(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 3)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
     SensorValue_T sensor_value = {.als = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) |
                                          ((uint32_t)p_payload[2] << 16)};
 
-    ProcessPresentAmbientLightLevel(src_addr, sensor_value);
+    SensorOutput_ProcessPresentAmbientLightLevel(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessDeviceInputPower(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 3)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
     SensorValue_T sensor_value = {.power = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) |
                                            ((uint32_t)p_payload[2] << 16)};
 
-    ProcessPresentDeviceInputPower(src_addr, sensor_value);
+    SensorOutput_ProcessPresentDeviceInputPower(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessPresentInputCurrent(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 2)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
-    SensorValue_T sensor_value = {.current = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8)};
+    SensorValue_T sensor_value;
+    sensor_value.current = ((uint16_t)p_payload[0]) | ((uint16_t)p_payload[1] << 8);
 
-    ProcessPresentInputCurrent(src_addr, sensor_value);
+    SensorOutput_ProcessPresentInputCurrent(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessPresentInputVoltage(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 2)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
-    SensorValue_T sensor_value = {.voltage = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8)};
+    SensorValue_T sensor_value;
+    sensor_value.voltage = ((uint16_t)p_payload[0]) | ((uint16_t)p_payload[1] << 8);
 
-    ProcessPresentInputVoltage(src_addr, sensor_value);
+    SensorOutput_ProcessPresentInputVoltage(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 3)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
     SensorValue_T sensor_value = {
         .energy = (((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) | ((uint32_t)p_payload[2] << 16))};
 
-    ProcessTotalDeviceEnergyUse(src_addr, sensor_value);
+    SensorOutput_ProcessTotalDeviceEnergyUse(src_addr, sensor_value);
 }
 
 static void MeshInternal_ProcessPreciseTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
     if (len != 4)
     {
-        INFO("Invalid Length Sensor Status message\n");
+        LOG_INFO("Invalid Length Sensor Status message");
         return;
     }
 
     SensorValue_T sensor_value = {.precise_energy = ((uint32_t)p_payload[0]) | ((uint32_t)p_payload[1] << 8) |
                                                     ((uint32_t)p_payload[2] << 16) | ((uint32_t)p_payload[3] << 24)};
 
-    ProcessPreciseTotalDeviceEnergyUse(src_addr, sensor_value);
+    SensorOutput_ProcessPreciseTotalDeviceEnergyUse(src_addr, sensor_value);
 }

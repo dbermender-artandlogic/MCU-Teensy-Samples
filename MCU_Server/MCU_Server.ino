@@ -23,25 +23,21 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <math.h>
 #include <string.h>
 
-#include "Config.h"
+#include "LightElTestSrv.h"
+#include "Log.h"
 #include "MCU_Attention.h"
 #include "MCU_DFU.h"
+#include "MCU_Definitions.h"
 #include "MCU_Health.h"
 #include "MCU_Lightness.h"
-#include "MCU_Sensor.h"
 #include "Mesh.h"
+#include "MeshTime.h"
+#include "RTC.h"
 #include "SDM.h"
+#include "SensorInput.h"
 #include "UARTProtocol.h"
 
-enum ModemState_t
-{
-    MODEM_STATE_INIT_DEVICE,
-    MODEM_STATE_DEVICE,
-    MODEM_STATE_INIT_NODE,
-    MODEM_STATE_NODE,
-    MODEM_STATE_UNKNOWN = 0xFF,
-};
-
+#define RTC_TIME_ACCURACY_PPB 10000 /**<  Accuracy of PCF8253 RTC */
 
 static const uint8_t ctl_registration[] = {
     lowByte(MESH_MODEL_ID_LIGHT_CTL_SERVER),
@@ -51,6 +47,39 @@ static const uint8_t ctl_registration[] = {
     highByte(LIGHT_CTL_TEMP_RANGE_MIN),
     lowByte(LIGHT_CTL_TEMP_RANGE_MAX),
     highByte(LIGHT_CTL_TEMP_RANGE_MAX),
+};
+
+static const uint8_t time_with_battery_registration[] = {
+    lowByte(MESH_MODEL_ID_TIME_SERVER),
+    highByte(MESH_MODEL_ID_TIME_SERVER),
+    RTC_WITH_BATTERY_ATTACHED,
+    lowByte(RTC_TIME_ACCURACY_PPB),
+    highByte(RTC_TIME_ACCURACY_PPB),
+};
+
+static const uint8_t time_without_battery_registration[] = {
+    lowByte(MESH_MODEL_ID_TIME_SERVER),
+    highByte(MESH_MODEL_ID_TIME_SERVER),
+    RTC_WITHOUT_BATTERY_ATTACHED,
+    lowByte(RTC_TIME_ACCURACY_PPB),
+    highByte(RTC_TIME_ACCURACY_PPB),
+};
+
+static const uint8_t time_without_rtc_registration[] = {
+    lowByte(MESH_MODEL_ID_TIME_SERVER),
+    highByte(MESH_MODEL_ID_TIME_SERVER),
+    RTC_NOT_ATTACHED,
+    0x00,
+    0x00,
+};
+
+static const uint8_t light_el_server_registration[] = {
+    lowByte(MESH_MODEL_ID_LIGHT_EL_SERVER),
+    highByte(MESH_MODEL_ID_LIGHT_EL_SERVER),
+    lowByte(LIGHT_EL_TEST_SRV_EMERGENCY_MANUFACTURER_MIN_LIGHTNESS_DC),
+    highByte(LIGHT_EL_TEST_SRV_EMERGENCY_MANUFACTURER_MIN_LIGHTNESS_DC),
+    lowByte(LIGHT_EL_TEST_SRV_EMERGENCY_MANUFACTURER_MAX_LIGHTNESS_DC),
+    highByte(LIGHT_EL_TEST_SRV_EMERGENCY_MANUFACTURER_MAX_LIGHTNESS_DC),
 };
 
 static const uint8_t lightness_registration[] = {
@@ -165,8 +194,10 @@ static ModemState_t ModemState = MODEM_STATE_UNKNOWN;
 
 static bool       CTLEnabled    = (ENABLE_CTL != 0);
 static bool       LCEnabled     = (ENABLE_LC != 0);
+static bool       RtcEnabled    = false;
 static const bool PIRALSEnabled = (ENABLE_PIRALS != 0);
 static const bool ENERGYEnabled = (ENABLE_ENERGY != 0);
+static const bool ELTestEnabled = (ENABLE_LC != 0);
 
 
 /*
@@ -231,9 +262,70 @@ void ProcessError(uint8_t *p_payload, uint8_t len);
 void ProcessStartTest(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Process ALS update
+ *
+ *  @param value_clux  New ALS value in clux
+ *  @param src_addr    Source address
+ */
+void ProcessPresentAmbientLightLevel(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process PIR update
+ *
+ *  @param value       New PIR value
+ *  @param src_addr    Source address
+ */
+void ProcessPresenceDetected(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Power value update
+ *
+ *  @param value       New Power value
+ *  @param src_addr    Source address
+ */
+void ProcessPresentDeviceInputPower(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Current value update
+ *
+ *  @param value       New Current value
+ *  @param src_addr    Source address
+ */
+void ProcessPresentInputCurrent(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Voltage value update
+ *
+ *  @param value       New Voltage value
+ *  @param src_addr    Source address
+ */
+void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Energy value update
+ *
+ *  @param value       New Energy value
+ *  @param src_addr    Source address
+ */
+void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
+ *  Process Precise Energy value update
+ *
+ *  @param value       New Energy value
+ *  @param src_addr    Source address
+ */
+void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value);
+
+/*
  *  Send Firmware Version Set request
  */
 void SendFirmwareVersionSetRequest(void);
+
+/*
+ *  Process FactoryResetEvent
+ */
+void ProcessFactoryResetEvent(void);
 
 /*
  *  Process Firmware Version set response
@@ -260,46 +352,79 @@ void SetupDebug(void)
 
 void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Init Device State.\n");
+    LOG_INFO("Init Device State");
     ModemState = MODEM_STATE_INIT_DEVICE;
     AttentionStateSet(false);
 
     if (!Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_LIGHT_CTL_SERVER) && CTLEnabled)
     {
-        INFO("Modem does not support Light CTL Server.\n");
+        LOG_INFO("Modem does not support Light CTL Server");
 
         if (Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_LIGHT_LC_SERVER))
         {
-            INFO("Disabling CTL activating LC.\n");
+            LOG_INFO("Disabling CTL activating LC");
             CTLEnabled = false;
             LCEnabled  = true;
         }
     }
 
-    if (!Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_LIGHT_LC_SERVER) && LCEnabled)
+    if (!Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_TIME_SERVER) && RtcEnabled)
     {
-        INFO("Modem does not support Light LC Server.\n");
+        LOG_INFO("Modem does not support Time Server");
         return;
     }
 
     if (!Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_SENSOR_SERVER) && (PIRALSEnabled || ENERGYEnabled))
     {
-        INFO("Modem does not support Sensor Server.\n");
+        LOG_INFO("Modem does not support Sensor Server");
         return;
     }
 
-    size_t payload_len = 0;
+    if (!Mesh_IsModelAvailable(p_payload, len, MESH_MODEL_ID_SENSOR_SERVER) && (PIRALSEnabled || ENERGYEnabled))
+    {
+        LOG_INFO("Modem does not support Sensor Server");
+        return;
+    }
+
+    size_t payload_len      = 0;
+    bool   battery_detected = RTC_IsBatteryDetected();
 
     if (CTLEnabled)
+    {
         payload_len += sizeof(ctl_registration);
+    }
     else if (LCEnabled)
+    {
         payload_len += sizeof(lightness_registration);
+    }
+
+    if (RtcEnabled && battery_detected)
+    {
+        payload_len += sizeof(time_with_battery_registration);
+    }
+    else if (RtcEnabled)
+    {
+        payload_len += sizeof(time_without_battery_registration);
+    }
+    else
+    {
+        payload_len += sizeof(time_without_rtc_registration);
+    }
+
+    if (ELTestEnabled)
+    {
+        payload_len += sizeof(light_el_server_registration);
+    }
 
     if (PIRALSEnabled)
+    {
         payload_len += sizeof(pir_registration) + sizeof(als_registration);
+    }
 
     if (ENERGYEnabled)
+    {
         payload_len += sizeof(current_precise_energy_registration) + sizeof(voltage_power_registration);
+    }
 
     payload_len += sizeof(health_registration);
 
@@ -315,6 +440,28 @@ void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len)
     {
         memcpy(model_ids + index, lightness_registration, sizeof(lightness_registration));
         index += sizeof(lightness_registration);
+    }
+
+    if (RtcEnabled && battery_detected)
+    {
+        memcpy(model_ids + index, time_with_battery_registration, sizeof(time_with_battery_registration));
+        index += sizeof(time_with_battery_registration);
+    }
+    else if (RtcEnabled)
+    {
+        memcpy(model_ids + index, time_without_battery_registration, sizeof(time_without_battery_registration));
+        index += sizeof(time_without_battery_registration);
+    }
+    else
+    {
+        memcpy(model_ids + index, time_without_rtc_registration, sizeof(time_without_rtc_registration));
+        index += sizeof(time_without_rtc_registration);
+    }
+
+    if (ELTestEnabled)
+    {
+        memcpy(model_ids + index, light_el_server_registration, sizeof(light_el_server_registration));
+        index += sizeof(light_el_server_registration);
     }
 
     if (PIRALSEnabled)
@@ -341,7 +488,7 @@ void ProcessEnterInitDevice(uint8_t *p_payload, uint8_t len)
 
 void ProcessEnterDevice(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Device State.\n");
+    LOG_INFO("Device State");
 
     EnableStartupSequence();
     ModemState = MODEM_STATE_DEVICE;
@@ -349,15 +496,16 @@ void ProcessEnterDevice(uint8_t *p_payload, uint8_t len)
 
 void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Init Node State.\n");
+    LOG_INFO("Init Node State");
     ModemState = MODEM_STATE_INIT_NODE;
     AttentionStateSet(false);
 
     SetLightnessServerIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerPIRIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerALSIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerCurrPreciseEnergyIdx(INSTANCE_INDEX_UNKNOWN);
-    SetSensorServerVoltPowIdx(INSTANCE_INDEX_UNKNOWN);
+    SensorInput_SetPirIdx(INSTANCE_INDEX_UNKNOWN);
+    SensorInput_SetAlsIdx(INSTANCE_INDEX_UNKNOWN);
+    SetTimeServerInstanceIdx(INSTANCE_INDEX_UNKNOWN);
+    SensorInput_SetCurrPreciseEnergyIdx(INSTANCE_INDEX_UNKNOWN);
+    SensorInput_SetVoltPowIdx(INSTANCE_INDEX_UNKNOWN);
 
     uint8_t sensor_server_model_id_occurency = 0;
 
@@ -373,6 +521,12 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
             SetLightCTLSupport(model_id == MESH_MODEL_ID_LIGHT_CTL_SERVER);
         }
 
+        if (MESH_MODEL_ID_TIME_SERVER == model_id)
+        {
+            uint16_t current_model_id_instance_index = index / 2;
+            SetTimeServerInstanceIdx(current_model_id_instance_index);
+        }
+
         if (model_id == MESH_MODEL_ID_SENSOR_SERVER)
         {
             uint16_t current_model_id_instance_index = index / 2;
@@ -380,19 +534,19 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
 
             if (sensor_server_model_id_occurency == PIR_REGISTRATION_ORDER && PIRALSEnabled)
             {
-                SetSensorServerPIRIdx(current_model_id_instance_index);
+                SensorInput_SetPirIdx(current_model_id_instance_index);
             }
             else if (sensor_server_model_id_occurency == ALS_REGISTRATION_ORDER && PIRALSEnabled)
             {
-                SetSensorServerALSIdx(current_model_id_instance_index);
+                SensorInput_SetAlsIdx(current_model_id_instance_index);
             }
             else if (sensor_server_model_id_occurency == CURR_ENERGY_REGISTRATION_ORDER && ENERGYEnabled)
             {
-                SetSensorServerCurrPreciseEnergyIdx(current_model_id_instance_index);
+                SensorInput_SetCurrPreciseEnergyIdx(current_model_id_instance_index);
             }
             else if (sensor_server_model_id_occurency == VOLT_POWER_REGISTRATION_ORDER && ENERGYEnabled)
             {
-                SetSensorServerVoltPowIdx(current_model_id_instance_index);
+                SensorInput_SetVoltPowIdx(current_model_id_instance_index);
             }
         }
 
@@ -406,42 +560,42 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
     if (GetLightnessServerIdx() == INSTANCE_INDEX_UNKNOWN && (LCEnabled || CTLEnabled))
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Light CTL/LC Server model id not found in init node message\n");
+        LOG_INFO("Light CTL/LC Server model id not found in init node message");
         return;
     }
 
-    if (GetSensorServerPIRIdx() == INSTANCE_INDEX_UNKNOWN && PIRALSEnabled)
+    if (SensorInput_GetPirIdx() == INSTANCE_INDEX_UNKNOWN && PIRALSEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Sensor server (PIR) model id not found in init node message\n");
+        LOG_INFO("Sensor server (PIR) model id not found in init node message");
         return;
     }
 
-    if (GetSensorServerALSIdx() == INSTANCE_INDEX_UNKNOWN && PIRALSEnabled)
+    if (SensorInput_GetAlsIdx() == INSTANCE_INDEX_UNKNOWN && PIRALSEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Sensor server (ALS) model id not found in init node message\n");
+        LOG_INFO("Sensor server (ALS) model id not found in init node message");
         return;
     }
 
-    if (GetSensorServerCurrPreciseEnergyIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
+    if (SensorInput_GetCurrPreciseEnergyIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Sensor server (Voltage Current) model id not found in init node message\n");
+        LOG_INFO("Sensor server (Voltage Current) model id not found in init node message");
         return;
     }
 
-    if (GetSensorServerVoltPowIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
+    if (SensorInput_GetVoltPowIdx() == INSTANCE_INDEX_UNKNOWN && ENERGYEnabled)
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Sensor server (Power Energy) model id not found in init node message\n");
+        LOG_INFO("Sensor server (Power Energy) model id not found in init node message");
         return;
     }
 
     if (GetHealthSrvIdx() == INSTANCE_INDEX_UNKNOWN)
     {
         ModemState = MODEM_STATE_UNKNOWN;
-        INFO("Health Server model id not found in init node message\n");
+        LOG_INFO("Health Server model id not found in init node message");
         return;
     }
 
@@ -451,7 +605,7 @@ void ProcessEnterInitNode(uint8_t *p_payload, uint8_t len)
 
 void ProcessEnterNode(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Node State.\n");
+    LOG_INFO("Node State");
     ModemState = MODEM_STATE_NODE;
 
     SynchronizeLightness();
@@ -462,9 +616,14 @@ void ProcessMeshCommand(uint8_t *p_payload, uint8_t len)
     Mesh_ProcessMeshCommand(p_payload, len);
 }
 
+void ProcessMeshMessageRequest1(uint8_t *p_payload, uint8_t len)
+{
+    Mesh_ProcessMeshMessageRequest1(p_payload, len);
+}
+
 void ProcessError(uint8_t *p_payload, uint8_t len)
 {
-    INFO("Error %d\n\n.", p_payload[0]);
+    LOG_INFO("Error %d", p_payload[0]);
 }
 
 void SendFirmwareVersionSetRequest(void)
@@ -478,22 +637,59 @@ void ProcessFirmwareVersionSetResponse(void)
 {
 }
 
+void ProcessFactoryResetEvent(void)
+{
+}
+
+void ProcessModemFirmwareVersion(uint8_t *p_payload, uint8_t len)
+{
+}
+
+void ProcessPresentAmbientLightLevel(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessPresenceDetected(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessPresentDeviceInputPower(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessPresentInputCurrent(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessPresentInputVoltage(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
+void ProcessPreciseTotalDeviceEnergyUse(uint16_t src_addr, SensorValue_T sensor_value)
+{
+}
+
 void setup(void)
 {
     SetupDebug();
-    INFO("Server Sample.\n");
+    LOG_INFO("Server Sample");
     SetupAttention();
     SetupHealth();
 
     if (LCEnabled || CTLEnabled)
         SetupLightnessServer();
     if (PIRALSEnabled)
-        SetupSensorServer();
+        SensorInput_Setup();
     if (ENERGYEnabled)
         SetupSDM();
 
     UART_Init();
     UART_SendSoftwareResetRequest();
+    RtcEnabled = RTC_Init(UART_SendTimeSourceGetResponse, UART_SendTimeSourceSetResponse);
 
     SetupDFU();
 }
@@ -514,6 +710,13 @@ void loop(void)
 
     if (MODEM_STATE_NODE == ModemState)
     {
-        LoopSensorServer();
+        SensorInput_Loop();
+        LoopRTC();
     }
+
+    if (ELTestEnabled)
+    {
+        LoopLightElTest();
+    }
+    LoopMeshTimeSync();
 }

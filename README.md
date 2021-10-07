@@ -22,3 +22,9 @@
 ## Troubleshooting tips:
 - Make sure you have proper serial port selected in Arduino IDE: Tools -> Port -> COMx
 - You can read debug console in Arduino IDE: Tools -> Serial Monitor (115200 baud)
+
+## Logger
+There are two levels of logging: `LOG_INFO` and `LOG_DEBUG`. 
+To enable `LOG_INFO`, `LOG_INFO_ENABLE` flag located in `Log.h` must be set to 1.
+To enable `LOG_DEBUG`, `LOG_DEBUG_ENABLE` flag located in `Log.h` must be set to 1.
+Enabling one flag does not enable the other. To enable all available logs, both flags must be enabled.

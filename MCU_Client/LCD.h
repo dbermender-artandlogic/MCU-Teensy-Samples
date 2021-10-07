@@ -24,7 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "MCU_Definitions.h"
-#include "MCU_Sensor.h"
+#include "SensorOutput.h"
 #include "stdint.h"
 #include "stdlib.h"
 

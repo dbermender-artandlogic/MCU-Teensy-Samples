@@ -19,11 +19,13 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef MCU_SENSOR_SERVER_H
-#define MCU_SENSOR_SERVER_H
+#ifndef SENSOR_INPUT_H
+#define SENSOR_INPUT_H
 
 
 #include <stdint.h>
+
+#include "Config.h"
 
 
 #define MESH_TOLERANCE(_error) ((uint16_t)((4095 * _error) / 100))
@@ -275,62 +277,98 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MESH_PROP_PRECISE_TOTAL_DEVICE_ENERGY_USE_UNKNOWN_VAL 0xFFFFFFFF
 
 
-/*
- *  Sensor Server ALS instance index setter
- */
-void SetSensorServerALSIdx(uint8_t idx);
+#if ENABLE_PIRALS == 1
+#define PIR_REGISTRATION_ORDER 1 /**< Defines sensor servers registration order */
+#define ALS_REGISTRATION_ORDER 2 /**< Defines sensor servers registration order */
+#else
+#define PIR_REGISTRATION_ORDER 0 /**< Defines sensor servers registration order */
+#define ALS_REGISTRATION_ORDER 0 /**< Defines sensor servers registration order */
+#endif
+
+#define CURR_ENERGY_REGISTRATION_ORDER (ALS_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
+#define VOLT_POWER_REGISTRATION_ORDER \
+    (CURR_ENERGY_REGISTRATION_ORDER + 1) /**< Defines sensor servers registration order */
+
+
+typedef union
+{
+    uint32_t als;
+    uint8_t  pir;
+    uint32_t power;
+    uint16_t current;
+    uint16_t voltage;
+    uint32_t energy;
+    uint32_t precise_energy;
+} SensorValue_T;
+
+typedef enum
+{
+    PRESENCE_DETECTED               = 0x004D,
+    PRESENT_AMBIENT_LIGHT_LEVEL     = 0x004E,
+    PRESENT_DEVICE_INPUT_POWER      = 0x0052,
+    PRESENT_INPUT_CURRENT           = 0x0057,
+    PRESENT_INPUT_VOLTAGE           = 0x0059,
+    TOTAL_DEVICE_ENERGY_USE         = 0x006A,
+    PRECISE_TOTAL_DEVICE_ENERGY_USE = 0x0072
+} SensorProperty_T;
+
 
 /*
- *  Sensor Server ALS instance index getter
+ *  Sensor Input ALS instance index setter
+ */
+void SensorInput_SetAlsIdx(uint8_t idx);
+
+/*
+ *  Sensor Input ALS instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerALSIdx(void);
+uint8_t SensorInput_GetAlsIdx(void);
 
 /*
- *  Sensor Server PIR instance index setter
+ *  Sensor Input PIR instance index setter
  */
-void SetSensorServerPIRIdx(uint8_t idx);
+void SensorInput_SetPirIdx(uint8_t idx);
 
 /*
- *  Sensor Server PIR instance index getter
+ *  Sensor Input PIR instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerPIRIdx(void);
+uint8_t SensorInput_GetPirIdx(void);
 
 /*
- *  Sensor Server Voltage Current instance index setter
+ *  Sensor Input Voltage Current instance index setter
  */
-void SetSensorServerCurrPreciseEnergyIdx(uint8_t idx);
+void SensorInput_SetCurrPreciseEnergyIdx(uint8_t idx);
 
 /*
- *  Sensor Server Voltage Current instance index getter
+ *  Sensor Input Voltage Current instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerCurrPreciseEnergyIdx(void);
+uint8_t SensorInput_GetCurrPreciseEnergyIdx(void);
 
 /*
- *  Sensor Server Power Energy instance index setter
+ *  Sensor Input Power Energy instance index setter
  */
-void SetSensorServerVoltPowIdx(uint8_t idx);
+void SensorInput_SetVoltPowIdx(uint8_t idx);
 
 /*
- *  Sensor Server Power Energy instance index getter
+ *  Sensor Input Power Energy instance index getter
  *
  *  @return  Instance index
  */
-uint8_t GetSensorServerVoltPowIdx(void);
+uint8_t SensorInput_GetVoltPowIdx(void);
 
 /*
- *  Setup sensor server hardware
+ *  Setup Sensor Input hardware
  */
-void SetupSensorServer(void);
+void SensorInput_Setup(void);
 
 /*
- *  Sensor server main function, should be called in Arduino main loop
+ *  Sensor Input main function, should be called in Arduino main loop
  */
-void LoopSensorServer(void);
+void SensorInput_Loop(void);
 
-#endif    // MCU_SENSOR_SERVER_H
+#endif    // SENSOR_INPUT_H

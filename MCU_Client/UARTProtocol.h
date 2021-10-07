@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "Config.h"
+#include "RTC.h"
 #include "stdint.h"
 
 
@@ -34,6 +35,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *  Setup UART hardware
  */
 void UART_Init(void);
+
+/*
+ *  Enables Ping Requests and Responses
+ */
+void UART_EnablePings(void);
+
+/*
+ *  Disables Ping Requests and Responses
+ */
+void UART_DisablePings(void);
 
 /*
  *  Send Ping Request command
@@ -47,11 +58,6 @@ void UART_SendPingRequest(void);
  *  @param len           Payload len
  */
 void UART_SendPongResponse(uint8_t *p_payload, uint8_t len);
-
-/*
- *  Send Software Reset Request command
- */
-void UART_SendSoftwareResetRequest(void);
 
 /*
  *  Send Create Instances Request command
@@ -70,12 +76,25 @@ void UART_SendCreateInstancesRequest(uint8_t *model_id, uint8_t len);
 void UART_SendMeshMessageRequest(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Send Mesh Message Request1 command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendMeshMessageRequest1(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Send Sensor Update Request command
  *
  *  @param * p_payload   Command payload
  *  @param len           Payload len
  */
 void UART_SendSensorUpdateRequest(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Software Reset Request command
+ */
+void UART_SendSoftwareResetRequest(void);
 
 /*
  *  Send Firmware Version Set Request command
@@ -94,6 +113,38 @@ void UART_StartNodeRequest(void);
  *  Send Firmware Version Request command
  */
 void UART_ModemFirmwareVersionRequest(void);
+
+/*
+ *  Send Set Fault Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendSetFaultRequest(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Clear Fault Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendClearFaultRequest(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Test Start Response command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendTestStartResponse(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Test Finished Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendTestFinishedRequest(uint8_t *p_payload, uint8_t len);
 
 /*
  *  Send Dfu Init Response command
@@ -142,6 +193,44 @@ void UART_SendDfuStateCheckRequest(uint8_t *p_payload, uint8_t len);
  *  @param len           Payload len
  */
 void UART_SendDfuCancelRequest(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Firmware Version Set Request command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+*/
+void UART_SendFirmwareVersionSetRequest(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Send Time Source Get Response command
+ *
+ *  @param TimeDate*    Time contained in TimeSourceGetResponse
+ *  @param instance_idx instance index
+*/
+void UART_SendTimeSourceGetResponse(uint8_t instance_idx, TimeDate *time);
+
+/*
+ *  Send Time Source Set Response command
+ *
+ *  @param instance_idx instance index
+ */
+void UART_SendTimeSourceSetResponse(uint8_t instance_idx);
+
+/*
+ *  Send Time Get Request command
+ *
+ *  @param instance_idx instance index
+ */
+void UART_SendTimeGetRequest(uint8_t instance_idx);
+
+/*
+ *  Send Time BatteryStatusSetRequest command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+void UART_SendBatteryStatusSetRequest(uint8_t *p_payload, uint8_t len);
 
 /*
  *  Receive and process incoming UART command
@@ -213,6 +302,14 @@ extern void ProcessError(uint8_t *p_payload, uint8_t len);
 extern void ProcessModemFirmwareVersion(uint8_t *p_payload, uint8_t len);
 
 /*
+ *  Process Start Test command
+ *
+ *  @param * p_payload   Command payload
+ *  @param len           Payload len
+ */
+extern void ProcessStartTest(uint8_t *p_payload, uint8_t len);
+
+/*
  *  Process Dfu Init Request command
  *
  *  @param * p_payload   Command payload
@@ -267,6 +364,11 @@ extern void ProcessDfuStateCheckResponse(uint8_t *p_payload, uint8_t len);
  *  @param len           Payload len
  */
 extern void ProcessDfuCancelResponse(uint8_t *p_payload, uint8_t len);
+
+/*
+ *  Process Firmware Version set response
+ */
+extern void ProcessFirmwareVersionSetResponse(void);
 
 /*
  *  Process FactoryResetEvent

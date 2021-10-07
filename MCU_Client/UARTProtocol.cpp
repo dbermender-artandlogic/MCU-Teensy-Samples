@@ -19,14 +19,14 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTI
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-
 #include "UARTProtocol.h"
 
 #include "Arduino.h"
 #include "CRC.h"
-#include "Config.h"
+#include "Log.h"
+#include "MeshTime.h"
 #include "UARTDriver.h"
-
+#include "Utils.h"
 
 /**< UART Command Codes definitions */
 #define UART_CMD_PING_REQUEST 0x01u
@@ -64,6 +64,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define UART_CMD_TEST_FINISHED_RESP 0x23u
 #define UART_CMD_FIRMWARE_VERSION_SET_REQ 0x24u
 #define UART_CMD_FIRMWARE_VERSION_SET_RESP 0x25u
+#define UART_CMD_BATTERY_STATUS_SET_REQ 0x26u
+#define UART_CMD_BATTERY_STATUS_SET_RESP 0x27u
+#define UART_CMD_MESH_MESSAGE_REQUEST_1 0x28u
+#define UART_CMD_TIME_SOURCE_SET_REQ 0x29u
+#define UART_CMD_TIME_SOURCE_SET_RESP 0x2Au
+#define UART_CMD_TIME_SOURCE_GET_REQ 0x2Bu
+#define UART_CMD_TIME_SOURCE_GET_RESP 0x2Cu
+#define UART_CMD_TIME_GET_REQ 0x2Du
+#define UART_CMD_TIME_GET_RESP 0x2Eu
 
 #define UART_CMD_DFU_INIT_REQ 0x80u
 #define UART_CMD_DFU_INIT_RESP 0x81u
@@ -96,9 +105,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define PAYLOAD_OFFSET 4u
 #define CRC_BYTE_1_OFFSET(len) (PAYLOAD_OFFSET + (len))
 #define CRC_BYTE_2_OFFSET(len) (PAYLOAD_OFFSET + (len) + 1)
-
-/** @brief Counts number of elements inside the array. */
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 
 typedef struct RxFrame_tag
@@ -154,13 +160,13 @@ void UART_Init(void)
 
 void UART_EnablePings(void)
 {
-    INFO("Pings enabled \n");
+    LOG_INFO("Pings enabled");
     UART_PingsEnabled = true;
 }
 
 void UART_DisablePings(void)
 {
-    INFO("Pings disabled \n");
+    LOG_INFO("Pings disabled");
     UART_PingsEnabled = false;
 }
 
@@ -195,6 +201,11 @@ void UART_SendMeshMessageRequest(uint8_t *p_payload, uint8_t len)
     UARTInternal_Send(len, UART_CMD_MESH_MESSAGE_REQUEST, p_payload);
 }
 
+void UART_SendMeshMessageRequest1(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_MESH_MESSAGE_REQUEST_1, p_payload);
+}
+
 void UART_SendSensorUpdateRequest(uint8_t *p_payload, uint8_t len)
 {
     UARTInternal_Send(len, UART_CMD_SENSOR_UPDATE_REQUEST, p_payload);
@@ -208,6 +219,26 @@ void UART_StartNodeRequest(void)
 void UART_ModemFirmwareVersionRequest(void)
 {
     UARTInternal_Send(0, UART_CMD_MODEM_FIRMWARE_VERSION_REQUEST, NULL);
+}
+
+void UART_SendSetFaultRequest(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_SET_FAULT_REQUEST, p_payload);
+}
+
+void UART_SendClearFaultRequest(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_CLEAR_FAULT_REQUEST, p_payload);
+}
+
+void UART_SendTestStartResponse(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_START_TEST_RESP, p_payload);
+}
+
+void UART_SendTestFinishedRequest(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_TEST_FINISHED_REQ, p_payload);
 }
 
 void UART_SendDfuInitResponse(uint8_t *p_payload, uint8_t len)
@@ -303,6 +334,11 @@ void UART_ProcessIncomingCommand(void)
             ProcessModemFirmwareVersion(rx_frame.p_payload, rx_frame.len);
             break;
         }
+        case UART_CMD_START_TEST_REQ:
+        {
+            ProcessStartTest(rx_frame.p_payload, rx_frame.len);
+            break;
+        }
         case UART_CMD_DFU_INIT_REQ:
         {
             ProcessDfuInitRequest(rx_frame.p_payload, rx_frame.len);
@@ -338,9 +374,29 @@ void UART_ProcessIncomingCommand(void)
             ProcessDfuCancelResponse(rx_frame.p_payload, rx_frame.len);
             break;
         }
+        case UART_CMD_FIRMWARE_VERSION_SET_RESP:
+        {
+            ProcessFirmwareVersionSetResponse();
+            break;
+        }
         case UART_CMD_FACTORY_RESET_EVENT:
         {
             ProcessFactoryResetEvent();
+            break;
+        }
+        case UART_CMD_TIME_SOURCE_SET_REQ:
+        {
+            MeshTime_ProcessTimeSourceSetRequest(rx_frame.p_payload, rx_frame.len);
+            break;
+        }
+        case UART_CMD_TIME_SOURCE_GET_REQ:
+        {
+            MeshTime_ProcessTimeSourceGetRequest(rx_frame.p_payload, rx_frame.len);
+            break;
+        }
+        case UART_CMD_TIME_GET_RESP:
+        {
+            MeshTime_ProcessTimeGetResponse(rx_frame.p_payload, rx_frame.len);
             break;
         }
     }
@@ -422,6 +478,40 @@ static bool ExtractFrameFromBuffer(RxFrame_t *rx_frame)
     return isCRCValid;
 }
 
+void UART_SendTimeSourceGetResponse(uint8_t instance_idx, TimeDate *time)
+{
+    TimeSourceGetResp_T msg = {0};
+
+    msg.instance_index = instance_idx;
+    msg.date           = *time;
+
+    UARTInternal_Send(sizeof(msg), UART_CMD_TIME_SOURCE_GET_RESP, (uint8_t *)&msg);
+}
+
+void UART_SendTimeSourceSetResponse(uint8_t instance_idx)
+{
+    TimeSourceSetResp_T msg = {0};
+
+    msg.instance_index = instance_idx;
+
+    UARTInternal_Send(sizeof(msg), UART_CMD_TIME_SOURCE_SET_RESP, (uint8_t *)&msg);
+}
+
+void UART_SendTimeGetRequest(uint8_t instance_idx)
+{
+    TimeGetReq_T msg = {0};
+
+    msg.instance_index = instance_idx;
+
+    UARTInternal_Send(sizeof(msg), UART_CMD_TIME_GET_REQ, (uint8_t *)&msg);
+}
+
+void UART_SendBatteryStatusSetRequest(uint8_t *p_payload, uint8_t len)
+{
+    UARTInternal_Send(len, UART_CMD_BATTERY_STATUS_SET_REQ, p_payload);
+}
+
+
 static void UARTInternal_Send(uint8_t len, uint8_t cmd, uint8_t *p_payload)
 {
     uint16_t crc;
@@ -446,58 +536,71 @@ static void UARTInternal_Send(uint8_t len, uint8_t cmd, uint8_t *p_payload)
 static void PrintDebug(const char *dir, uint8_t len, uint8_t cmd, uint8_t *buf, uint16_t crc)
 {
 #if LOG_DEBUG_ENABLE == 1
-    const char *cmdName[] = {"Unknown",
-                             "PingRequest",
-                             "PongResponse",
-                             "InitDeviceEvent",
-                             "CreateInstancesRequest",
-                             "CreateInstancesResponse",
-                             "InitNodeEvent",
-                             "MeshMessageRequest",
-                             "Unknown",
-                             "StartNodeRequest",
-                             "Unknown",
-                             "StartNodeResponse",
-                             "FactoryResetRequest",
-                             "FactoryResetResponse",
-                             "FactoryResetEvent",
-                             "MeshMessageResponse",
-                             "CurrentStateRequest",
-                             "CurrentStateResponse",
-                             "Error",
-                             "ModemFirmwareVersionRequest",
-                             "ModemFirmwareVersionResponse",
-                             "SensorUpdateRequest",
-                             "AttentionEvent",
-                             "SoftwareResetRequest",
-                             "SoftwareResetResponse",
-                             "SensorUpdateResponse",
-                             "DeviceUUIDRequest",
-                             "DeviceUUIDResponse",
-                             "SetFaultRequest",
-                             "SetFaultResponse",
-                             "ClearFaultRequest",
-                             "ClearFaultResponse",
-                             "StartTestRequest",
-                             "StartTestResponse",
-                             "TestFinishedRequest",
-                             "TestFinishedResponse",
-                             "FirmwareVersionSetRequest",
-                             "FirmwareVersionSetResponse"};
+    const char *cmdName[] = {
+        "Unknown",                      /* 0x00 */
+        "PingRequest",                  /* 0x01 */
+        "PongResponse",                 /* 0x02 */
+        "InitDeviceEvent",              /* 0x03 */
+        "CreateInstancesRequest",       /* 0x04 */
+        "CreateInstancesResponse",      /* 0x05 */
+        "InitNodeEvent",                /* 0x06 */
+        "MeshMessageRequest",           /* 0x07 */
+        "Unknown",                      /* 0x08 */
+        "StartNodeRequest",             /* 0x09 */
+        "Unknown",                      /* 0x0A */
+        "StartNodeResponse",            /* 0x0B */
+        "FactoryResetRequest",          /* 0x0C */
+        "FactoryResetResponse",         /* 0x0D */
+        "FactoryResetEvent",            /* 0x0E */
+        "MeshMessageResponse",          /* 0x0F */
+        "CurrentStateRequest",          /* 0x10 */
+        "CurrentStateResponse",         /* 0x11 */
+        "Error",                        /* 0x12 */
+        "ModemFirmwareVersionRequest",  /* 0x13 */
+        "ModemFirmwareVersionResponse", /* 0x14 */
+        "SensorUpdateRequest",          /* 0x15 */
+        "AttentionEvent",               /* 0x16 */
+        "SoftwareResetRequest",         /* 0x17 */
+        "SoftwareResetResponse",        /* 0x18 */
+        "SensorUpdateResponse",         /* 0x19 */
+        "DeviceUUIDRequest",            /* 0x1A */
+        "DeviceUUIDResponse",           /* 0x1B */
+        "SetFaultRequest",              /* 0x1C */
+        "SetFaultResponse",             /* 0x1D */
+        "ClearFaultRequest",            /* 0x1E */
+        "ClearFaultResponse",           /* 0x1F */
+        "StartTestRequest",             /* 0x20 */
+        "StartTestResponse",            /* 0x21 */
+        "TestFinishedRequest",          /* 0x22 */
+        "TestFinishedResponse",         /* 0x23 */
+        "FirmwareVersionSetRequest",    /* 0x24 */
+        "FirmwareVersionSetResponse",   /* 0x25 */
+        "BatteryStatusSetRequest",      /* 0x26 */
+        "BatteryStatusSetResponse",     /* 0x27 */
+        "MeshMessageRequest1",          /* 0x28 */
+        "TimeSourceSetRequest",         /* 0x29 */
+        "TimeSourceSetResponse",        /* 0x2A */
+        "TimeSourceGetRequest",         /* 0x2B */
+        "TimeSourceGetResponse",        /* 0x2C */
+        "TimeGetRequest",               /* 0x2D */
+        "TimeGetResponse",              /* 0x2E */
+    };
 
-    const char *dfuCmdName[] = {"DfuInitRequest",
-                                "DfuInitResponse",
-                                "DfuStatusRequest",
-                                "DfuStatusResponse",
-                                "DfuPageCreateRequest",
-                                "DfuPageCreateResponse",
-                                "DfuWriteDataEvent",
-                                "DfuPageStoreRequest",
-                                "DfuPageStoreResponse",
-                                "DfuStateCheckRequest",
-                                "DfuStateCheckResponse",
-                                "DfuCancelRequest",
-                                "DfuCancelResponse"};
+    const char *dfuCmdName[] = {
+        "DfuInitRequest",        /* 0x80 */
+        "DfuInitResponse",       /* 0x81 */
+        "DfuStatusRequest",      /* 0x82 */
+        "DfuStatusResponse",     /* 0x83 */
+        "DfuPageCreateRequest",  /* 0x84 */
+        "DfuPageCreateResponse", /* 0x85 */
+        "DfuWriteDataEvent",     /* 0x86 */
+        "DfuPageStoreRequest",   /* 0x87 */
+        "DfuPageStoreResponse",  /* 0x88 */
+        "DfuStateCheckRequest",  /* 0x89 */
+        "DfuStateCheckResponse", /* 0x8A */
+        "DfuCancelRequest",      /* 0x8B */
+        "DfuCancelResponse",     /* 0x8C */
+    };
 
     const char unknown_command_name[] = "Unknown";
 
@@ -518,16 +621,11 @@ static void PrintDebug(const char *dir, uint8_t len, uint8_t cmd, uint8_t *buf, 
         }
     }
 
-    DEBUG("%s %s command\n", dir, command_name);
-    DEBUG("\t Len: 0x%02X\n", len);
-    DEBUG("\t Cmd: 0x%02X\n", cmd);
-    DEBUG("\t Data: ");
-    for (size_t i = 0; i < len; i++)
-    {
-        DEBUG("0x%02X ", buf[i]);
-    }
-    DEBUG("\n");
-    DEBUG("\t CRC: 0x%02X%02X\n\n", lowByte(crc), highByte(crc));
+    LOG_DEBUG("%s %s command", dir, command_name);
+    LOG_DEBUG("\t Len: 0x%02X", len);
+    LOG_DEBUG("\t Cmd: 0x%02X", cmd);
+    LOG_DEBUG_HEXBUF("\t Data:", buf, len);
+    LOG_DEBUG("\t CRC: 0x%02X%02X", lowByte(crc), highByte(crc));
 #endif
 }
 
