@@ -40,7 +40,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #else
 
-#define DEBUG_INTERFACE (Serial1)       /**< Defines serial port to print debug messages. */
+#define DEBUG_INTERFACE (Serial)       /**< Defines serial port to print debug messages. */
 #define DEBUG_INTERFACE_BAUDRATE 115200 /**< Defines baudrate of debug interface. */
 #define UART_INTERFACE_BAUDRATE 57600   /**< Defines baudrate of modem interface. */
 

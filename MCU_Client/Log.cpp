@@ -21,6 +21,18 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Log.h"
 
+static bool toggleLCD = false;
+
+void setToggleLCD(bool val)
+{
+    toggleLCD = val;
+}
+
+bool getToggleLCD()
+{
+    return toggleLCD;
+}
+
 void _LOG_HEXBUF(const char *text, const void *buf, size_t len)
 {
     _PRINTF(text);

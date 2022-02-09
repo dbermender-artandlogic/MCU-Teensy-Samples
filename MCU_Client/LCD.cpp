@@ -354,6 +354,10 @@ void LCD_EraseSensorsValues(void)
 
 static void DisplayLine(size_t line, const char *text)
 {
+    if(getToggleLCD()){
+        LOG_INFO(text);
+    }
+
     if (strlen(text) > LCD_COLUMNS_NUMBER)
     {
         LOG_INFO("Trying to write too long string on LCD: %s", text);
@@ -546,6 +550,7 @@ static void DisplayScreen(uint8_t screenNum)
 
             if (last_time_sync->tai_seconds == TIME_TAI_SECONDS_TIME_UNKNOWN)
             {
+                DisplayLine(2, "NotFound");
                 DisplayLine(1, "Unknown");
                 DisplayLine(3, "Unknown");
             }

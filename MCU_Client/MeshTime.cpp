@@ -80,6 +80,7 @@ void MeshTime_ProcessTimeSourceSetRequest(uint8_t *p_payload, uint8_t len)
 {
     if ((p_payload == NULL) || (len != sizeof(TimeSourceSetReq_T)))
     {
+        LOG_DEBUG("1-------Process Mesh Command RTC_SetTime");
         return;
     }
 
@@ -87,13 +88,17 @@ void MeshTime_ProcessTimeSourceSetRequest(uint8_t *p_payload, uint8_t len)
 
     if (msg->instance_index != GetTimeServerInstanceIdx())
     {
+        LOG_DEBUG("2-------Process Mesh Command RTC_SetTime");
         return;
     }
 
     if (!ValidateTimeValuesRange(&msg->date) || !ValidateMonthDay(&msg->date))
     {
+        LOG_DEBUG("3-------Process Mesh Command RTC_SetTime");
         return;
     }
+
+    LOG_DEBUG("-------Process Mesh Command RTC_SetTime");
     RTC_SetTime(&msg->date);
 }
 
@@ -118,6 +123,7 @@ void MeshTime_ProcessTimeGetResponse(uint8_t *p_payload, uint8_t len)
 {
     if ((p_payload == NULL) || (len != sizeof(TimeGetResp_T)))
     {
+        LOG_DEBUG("1-------Process Mesh Command MeshTime_ProcessTimeGetResponse");
         return;
     }
 
@@ -125,6 +131,7 @@ void MeshTime_ProcessTimeGetResponse(uint8_t *p_payload, uint8_t len)
 
     if (msg->instance_index != GetTimeServerInstanceIdx())
     {
+        LOG_DEBUG("2-------Process Mesh Command MeshTime_ProcessTimeGetResponse");
         return;
     }
 
@@ -133,6 +140,8 @@ void MeshTime_ProcessTimeGetResponse(uint8_t *p_payload, uint8_t len)
     last_sync_time.subsecond               = msg->subsecond;
     last_sync_time.tai_utc_delta           = msg->tai_utc_delta;
     last_sync_time.time_zone_offset        = msg->time_zone_offset;
+
+    LOG_DEBUG("3-------Process Mesh Command MeshTime_ProcessTimeGetResponse %d", msg->tai_seconds);
 }
 
 MeshTimeLastSync_T *MeshTime_GetLastSyncTime(void)
@@ -146,9 +155,10 @@ void LoopMeshTimeSync(void)
 
     if (Timestamp_GetTimeElapsed(last_sync_time_ms, Timestamp_GetCurrent()) > SYNC_TIME_PERIOD_MS)
     {
-        LOG_INFO("LoopMeshTimeSync");
+        LOG_DEBUG("LoopMeshTimeSync");
 
         last_sync_time_ms += SYNC_TIME_PERIOD_MS;
+ 
         UART_SendTimeGetRequest(GetTimeServerInstanceIdx());
     }
 }

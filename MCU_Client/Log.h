@@ -32,14 +32,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Utils.h"
 
-#define LOG_INFO_ENABLE 0 /**< Enables INFO level logs */
+#define LOG_INFO_ENABLE 1 /**< Enables INFO level logs */
 #define LOG_DEBUG_ENABLE \
-    0 /**< Enables DEBUG level logs Enabling this make DFU impossible, due to implementation of UART in Arduino */
+    1 /**< Enables DEBUG level logs Enabling this make DFU impossible, due to implementation of UART in Arduino */
+
+static bool toggleLED = false;
+static int ledToggleCount = 0;
+
 
 #ifdef CMAKE_UNIT_TEST
 #define _PRINTF(format, ...) printf(format, ##__VA_ARGS__)
 #else
-#define _PRINTF(format, ...) DEBUG_INTERFACE.printf(format, ##__VA_ARGS__)
+#define _PRINTF(format, ...)                     \
+    DEBUG_INTERFACE.printf(format, ##__VA_ARGS__)
 #endif
 
 #define _LOG(format, ...)               \
@@ -48,6 +53,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         _PRINTF(format, ##__VA_ARGS__); \
         _PRINTF("\n");                  \
     } while (0)
+
+void setToggleLCD(bool val);
+bool getToggleLCD();
 
 static inline void _LOG_NULL(const char *format, ...)
 {

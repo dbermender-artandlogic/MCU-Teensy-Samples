@@ -430,6 +430,46 @@ void setup()
 
 void loop()
 {
+    if(DEBUG_INTERFACE.available()) {
+        String s = DEBUG_INTERFACE.readString();
+        toggleLED = true;
+
+        if(s.compareTo("toggleLED")==0){
+            LOG_INFO("received toggleLED");
+            toggleLED = true;
+        }
+
+        if(s.compareTo("LCD_Off")==0){
+            LOG_INFO("received LCD_Off");
+            setToggleLCD(false);
+        }
+
+        if(s.compareTo("LCD_On")==0){
+            LOG_INFO("received LCD_On");
+            setToggleLCD(true);
+        }
+    }
+
+    if(toggleLED){
+        digitalWrite(PIN_LED_STATUS, HIGH);
+    }else{
+        ledToggleCount = 0;
+    }
+
+    if(ledToggleCount<=10000){
+        ledToggleCount++;
+    }else{
+        toggleLED = false;  
+
+        /*if(toggleLED)
+            toggleLED = false;
+        else
+            toggleLED = true;*/
+
+        ledToggleCount = 0;
+        digitalWrite(PIN_LED_STATUS, LOW);
+    }
+
     Mesh_Loop();
     LCD_Loop();
     LoopAttention();

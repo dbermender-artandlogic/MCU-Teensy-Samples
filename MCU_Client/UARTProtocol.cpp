@@ -281,7 +281,7 @@ void UART_ProcessIncomingCommand(void)
     static RxFrame_t rx_frame;
 
     UARTDriver_RxDMAPoll();
-
+    
     if (!ExtractFrameFromBuffer(&rx_frame))
     {
         return;
@@ -316,6 +316,7 @@ void UART_ProcessIncomingCommand(void)
         }
         case UART_CMD_MESH_MESSAGE_REQUEST:
         {
+            LOG_DEBUG("+++++++++Process Mesh Command UART_CMD_MESH_MESSAGE_REQUEST");
             ProcessMeshCommand(rx_frame.p_payload, rx_frame.len);
             break;
         }
@@ -386,16 +387,19 @@ void UART_ProcessIncomingCommand(void)
         }
         case UART_CMD_TIME_SOURCE_SET_REQ:
         {
+            LOG_DEBUG("+++++++++Process Mesh Command UART_CMD_TIME_SOURCE_SET_REQ");
             MeshTime_ProcessTimeSourceSetRequest(rx_frame.p_payload, rx_frame.len);
             break;
         }
         case UART_CMD_TIME_SOURCE_GET_REQ:
         {
+            LOG_DEBUG("+++++++++Process Mesh Command UART_CMD_TIME_SOURCE_GET_REQ");
             MeshTime_ProcessTimeSourceGetRequest(rx_frame.p_payload, rx_frame.len);
             break;
         }
         case UART_CMD_TIME_GET_RESP:
         {
+            LOG_DEBUG("+++++++++Process Mesh Command UART_CMD_TIME_GET_RESP");
             MeshTime_ProcessTimeGetResponse(rx_frame.p_payload, rx_frame.len);
             break;
         }
@@ -621,11 +625,22 @@ static void PrintDebug(const char *dir, uint8_t len, uint8_t cmd, uint8_t *buf, 
         }
     }
 
+    if(strcmp(command_name,"PingRequest") == 0 
+            //|| strcmp(command_name,"TimeGetResponse") == 0 
+            || strcmp(command_name,"PongResponse") == 0 
+            //|| strcmp(command_name,"TimeGetRequest") == 0 
+            )
+        return;
+
+    toggleLED = true;
+    
     LOG_DEBUG("%s %s command", dir, command_name);
     LOG_DEBUG("\t Len: 0x%02X", len);
     LOG_DEBUG("\t Cmd: 0x%02X", cmd);
     LOG_DEBUG_HEXBUF("\t Data:", buf, len);
     LOG_DEBUG("\t CRC: 0x%02X%02X", lowByte(crc), highByte(crc));
+
+    //if(strcmp(command_name,"TimeGetResponse")){}
 #endif
 }
 

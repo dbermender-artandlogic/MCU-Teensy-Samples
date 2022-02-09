@@ -326,6 +326,7 @@ static void MeshInternal_ProcessPreciseTotalDeviceEnergyUse(uint8_t *p_payload, 
 
 bool Mesh_IsModelAvailable(uint8_t *p_payload, uint8_t len, uint16_t expected_model_id)
 {
+    LOG_DEBUG("Mesh_IsModelAvailable");
     for (size_t index = 0; index < len;)
     {
         uint16_t model_id = ((uint16_t)p_payload[index++]);
@@ -376,6 +377,7 @@ void Mesh_ProcessMeshCommand(uint8_t *p_payload, size_t len)
 
 void Mesh_SendLightLGet(uint8_t instance_idx)
 {
+    LOG_DEBUG("Mesh_SendLightLGet");
     uint8_t buf[MESH_MESSAGE_LIGHT_L_GET_LEN];
     size_t  index = 0;
 
@@ -389,6 +391,8 @@ void Mesh_SendLightLGet(uint8_t instance_idx)
 
 void Mesh_Loop(void)
 {
+    //LOG_DEBUG("+ + + + +Mesh_Loop");
+
     for (int i = 0; i < MESH_MESSAGES_QUEUE_LENGTH; i++)
     {
         if (MeshMsgsQueue[i] == NULL)
@@ -396,6 +400,9 @@ void Mesh_Loop(void)
         if (Timestamp_Compare(Timestamp_GetCurrent(), MeshMsgsQueue[i]->dispatch_time))
             continue;
 
+
+        LOG_DEBUG("+ + + + +Mesh_Loop- Command received");
+        
         switch (MeshMsgsQueue[i]->msg_type)
         {
             case GENERIC_ON_OFF_SET_MSG:
@@ -445,6 +452,7 @@ void Mesh_SendGenericOnOffSet(uint8_t  instance_idx,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
+    LOG_DEBUG("Mesh_SendGenericOnOffSet");
     static uint8_t tid = 0;
 
     if (is_new_transaction)
@@ -482,6 +490,7 @@ void Mesh_SendLightLSet(uint8_t  instance_idx,
                         uint8_t  num_of_repeats,
                         bool     is_new_transaction)
 {
+    LOG_DEBUG("Mesh_SendLightLSet");
     static uint8_t tid = 0;
 
     if (is_new_transaction)
@@ -519,6 +528,7 @@ void Mesh_SendGenericLevelSet(uint8_t  instance_idx,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
+    LOG_DEBUG("Mesh_SendGenericLevelSet");
     static uint8_t tid = 0;
 
     if (is_new_transaction)
@@ -556,6 +566,7 @@ void Mesh_SendGenericDeltaSet(uint8_t  instance_idx,
                               uint8_t  num_of_repeats,
                               bool     is_new_transaction)
 {
+    LOG_DEBUG("Mesh_SendGenericDeltaSet");
     static uint8_t tid = 0;
 
     if (is_new_transaction)
@@ -589,6 +600,7 @@ void Mesh_SendGenericDeltaSet(uint8_t  instance_idx,
 
 static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len)
 {
+    LOG_DEBUG("MeshInternal_ProcessLightLStatus");
     size_t   index = 0;
     uint16_t present_value;
     uint16_t target_value;
@@ -620,6 +632,7 @@ static void MeshInternal_ProcessLightLStatus(uint8_t *p_payload, size_t len)
 
 static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len)
 {
+    LOG_DEBUG("MeshInternal_ProcessLevelStatus");
     size_t   index = 0;
     int16_t  target_value;
     int16_t  present_value;
@@ -654,6 +667,7 @@ static void MeshInternal_ProcessLevelStatus(uint8_t *p_payload, size_t len)
 
 static void MeshInternal_ProcessLightCTLTempStatus(uint8_t *p_payload, size_t len)
 {
+    LOG_DEBUG("MeshInternal_ProcessLightCTLTempStatus");
     size_t   index = 0;
     uint16_t present_temperature;
     uint16_t present_delta_uv;
@@ -738,6 +752,7 @@ static bool MeshInternal_ConvertFromMeshFormatToMsTransitionTime(uint8_t time_me
 
 static void MeshInternal_SendGenericOnOffSet(uint8_t instance_idx, GenericOnOffSetMsg_T *message)
 {
+    LOG_DEBUG("MeshInternal_SendGenericOnOffSet");
     uint8_t buf[MESH_MESSAGE_GENERIC_ONOFF_SET_LEN];
     size_t  index = 0;
 
@@ -755,6 +770,7 @@ static void MeshInternal_SendGenericOnOffSet(uint8_t instance_idx, GenericOnOffS
 
 static void MeshInternal_SendLightLSet(uint8_t instance_idx, LightLSetMsg_T *message)
 {
+    LOG_DEBUG("MeshInternal_SendLightLSet");
     uint8_t buf[MESH_MESSAGE_LIGHT_L_SET_LEN];
     size_t  index = 0;
 
@@ -773,6 +789,7 @@ static void MeshInternal_SendLightLSet(uint8_t instance_idx, LightLSetMsg_T *mes
 
 static void MeshInternal_SendGenericLevelSet(uint8_t instance_idx, GenericLevelSetMsg_T *message)
 {
+    LOG_DEBUG("MeshInternal_SendGenericLevelSet");
     uint8_t buf[MESH_MESSAGE_GENERIC_LEVEL_SET_LEN];
     size_t  index = 0;
 
@@ -791,6 +808,7 @@ static void MeshInternal_SendGenericLevelSet(uint8_t instance_idx, GenericLevelS
 
 static void MeshInternal_SendGenericDeltaSet(uint8_t instance_idx, GenericDeltaSetMsg_T *message)
 {
+    LOG_DEBUG("MeshInternal_SendGenericDeltaSet");
     uint8_t buf[MESH_MESSAGE_GENERIC_DELTA_SET_LEN];
     size_t  index = 0;
 
@@ -837,6 +855,7 @@ static uint8_t MeshInternal_ConvertFromMsToMeshFormat(uint32_t time_ms)
 
 static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
 {
+    LOG_DEBUG("MeshInternal_ProcessSensorStatus");
     if (len < 2)
     {
         LOG_INFO("Received empty Sensor Status message");
@@ -882,6 +901,7 @@ static void MeshInternal_ProcessSensorStatus(uint8_t *p_payload, size_t len)
 
 static void MeshInternal_ProcessSensorProperty(uint16_t property_id, uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessSensorProperty");
     switch (property_id)
     {
         case PRESENCE_DETECTED:
@@ -928,6 +948,7 @@ static void MeshInternal_ProcessSensorProperty(uint16_t property_id, uint8_t *p_
 
 static void MeshInternal_ProcessPresenceDetected(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessPresenceDetected");
     if (len != 1)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -941,6 +962,7 @@ static void MeshInternal_ProcessPresenceDetected(uint8_t *p_payload, size_t len,
 
 static void MeshInternal_ProcessPresentAmbientLightLevel(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessPresentAmbientLightLevel");
     if (len != 3)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -955,6 +977,7 @@ static void MeshInternal_ProcessPresentAmbientLightLevel(uint8_t *p_payload, siz
 
 static void MeshInternal_ProcessDeviceInputPower(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessDeviceInputPower");
     if (len != 3)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -969,6 +992,7 @@ static void MeshInternal_ProcessDeviceInputPower(uint8_t *p_payload, size_t len,
 
 static void MeshInternal_ProcessPresentInputCurrent(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessPresentInputCurrent");
     if (len != 2)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -983,6 +1007,7 @@ static void MeshInternal_ProcessPresentInputCurrent(uint8_t *p_payload, size_t l
 
 static void MeshInternal_ProcessPresentInputVoltage(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessPresentInputVoltage");
     if (len != 2)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -997,6 +1022,7 @@ static void MeshInternal_ProcessPresentInputVoltage(uint8_t *p_payload, size_t l
 
 static void MeshInternal_ProcessTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessTotalDeviceEnergyUse");
     if (len != 3)
     {
         LOG_INFO("Invalid Length Sensor Status message");
@@ -1011,6 +1037,7 @@ static void MeshInternal_ProcessTotalDeviceEnergyUse(uint8_t *p_payload, size_t 
 
 static void MeshInternal_ProcessPreciseTotalDeviceEnergyUse(uint8_t *p_payload, size_t len, uint16_t src_addr)
 {
+    LOG_DEBUG("MeshInternal_ProcessPreciseTotalDeviceEnergyUse");
     if (len != 4)
     {
         LOG_INFO("Invalid Length Sensor Status message");
